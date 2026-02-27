@@ -1,0 +1,10 @@
+fisherman alert system guide:
+
+1. open the terminal
+
+2. paste: cd C:\Users\sanja\OneDrive\Desktop\FishermanAlert
+
+3. then paste:npm run dev
+
+
+the local host:http://localhost:5173/
