@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (never commit secrets)
+.env
+.env.*
+server/.env
+
+# ESLint output files
+eslint-results*.json
+eslint-output*.txt

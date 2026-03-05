@@ -3,7 +3,7 @@
  * Loads tiles from IndexedDB cache when available, falls back to online
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { getCachedTile } from '../utils/tileCache';
@@ -156,7 +156,6 @@ const CachedTileLayer = L.TileLayer.extend({
 export default function OfflineTileLayerComponent() {
   const map = useMap();
   const layerRef = useRef(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   useEffect(() => {
     // Create custom tile layer
@@ -170,19 +169,10 @@ export default function OfflineTileLayerComponent() {
     tileLayer.addTo(map);
     layerRef.current = tileLayer;
     
-    // Listen for online/offline events
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
     return () => {
       if (layerRef.current) {
         map.removeLayer(layerRef.current);
       }
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
     };
   }, [map]);
   

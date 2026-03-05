@@ -20,14 +20,49 @@ export default {
           900: '#0c4a6e',
         },
         alert: {
-           warning: '#f59e0b', // Amber 500
-           danger: '#ef4444', // Red 500
-           safe: '#10b981', // Emerald 500
+           warning: '#f59e0b',
+           danger: '#ef4444',
+           safe: '#10b981',
         }
       },
       animation: {
         'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-      }
+        'scale-in': 'scale-in 0.2s ease-out',
+        'slide-in-right': 'slide-in-right 0.3s ease-out',
+        'slide-in-up': 'slide-in-up 0.3s ease-out',
+        'bounce-slight': 'bounce-slight 2s ease-in-out infinite',
+        'fade-in': 'fade-in 0.2s ease-out',
+      },
+      keyframes: {
+        'scale-in': {
+          '0%': { transform: 'scale(0.90)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'slide-in-right': {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        'slide-in-up': {
+          '0%': { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
+        },
+        'bounce-slight': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+      },
+      screens: {
+        'xs': '320px',
+        'sm': '481px',
+        'md': '769px',
+        'lg': '1025px',
+        'xl': '1280px',
+        '2xl': '1536px',
+      },
     },
   },
   plugins: [],

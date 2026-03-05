@@ -1,7 +1,7 @@
 import { MapContainer, Marker, Polyline, Circle, useMap, useMapEvents } from 'react-leaflet';
 import { BORDER_POINTS } from '../utils/geo';
 import L from 'leaflet';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import OfflineTileLayer from './OfflineTileLayer';
 
 // Custom marker icon using embedded SVG (works offline)
@@ -47,7 +47,7 @@ function MapController({ position, isFollowing, onUserInteraction, onMapClick })
   return null;
 }
 
-export default function MapVisualizer({ position, status, isFollowing, setIsFollowing, savedSpots = [], onSaveSpot, onRemoveSpot, navigationTarget, onMapClick }) {
+export default function MapVisualizer({ position, status, isFollowing, setIsFollowing, savedSpots = [], onRemoveSpot, navigationTarget, onMapClick }) {
   const borderLine = BORDER_POINTS.map(p => [p.lat, p.lng]);
   
   const statusColor = {

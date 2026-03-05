@@ -55,8 +55,6 @@ function crossTrackDistanceToSegment(
   lat1, lng1, lat2, lng2 // segment start/end
 ) {
   const R = 6371e3;
-  const φ1 = lat1 * Math.PI / 180;
-  const λ1 = lng1 * Math.PI / 180;
   const θ12 = getBearing(lat1, lng1, lat2, lng2) * Math.PI / 180;
 
   const δ13 = calculateDistance(lat1, lng1, lat, lng) / R;

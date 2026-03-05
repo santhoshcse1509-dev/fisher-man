@@ -12,7 +12,6 @@ export default function TamilVoiceAssistant({
   onCommand, // Callback for specific actions
   distanceToBorder,
   status,
-  isFollowing,
   muted = false
 }) {
   const [isListening, setIsListening] = useState(false);
@@ -59,62 +58,26 @@ export default function TamilVoiceAssistant({
 
   const t = translations[language] || translations.ta;
 
-  // Initialize Speech Recognition
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setIsSupported(false);
-      return;
+  const speak = (text) => {
+    if (muted) return; // Follow app-wide muted state
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = language === 'ta' ? 'ta-IN' : 'en-US';
+      utterance.rate = 1.0;
+      window.speechSynthesis.speak(utterance);
     }
+  };
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = language === 'ta' ? 'ta-IN' : 'en-US';
+  const showFeedback = (text) => {
+    setFeedback(text);
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    feedbackTimeoutRef.current = setTimeout(() => {
+      setFeedback('');
+    }, 5000);
+  };
 
-    recognition.onresult = (event) => {
-      const current = event.resultIndex;
-      const resultTranscript = event.results[current][0].transcript.toLowerCase().trim();
-      setTranscript(resultTranscript);
-
-      if (event.results[current].isFinal) {
-        handleCommand(resultTranscript);
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      // Re-start if it was supposed to be listening
-      if (isListening) {
-        recognition.start();
-      }
-    };
-
-    recognitionRef.current = recognition;
-
-    // IMPORTANT: If we were already listening when language changed, restart it
-    if (isListening) {
-      try {
-        recognition.start();
-      } catch (err) {
-        console.warn('Recognition already started');
-      }
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
-      }
-    };
-  }, [language]); // Only restart on language change, not isListening (which is handled by toggle)
-
-  const handleCommand = (cmd) => {
+  const handleCommand = React.useCallback((cmd) => {
     let handled = false;
     let feedbackText = '';
 
@@ -158,26 +121,63 @@ export default function TamilVoiceAssistant({
     } else {
       showFeedback(t.unknown);
     }
-  };
+     
+  }, [distanceToBorder, onCommand, status, t]);
 
-  const speak = (text) => {
-    if (muted) return; // Follow app-wide muted state
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = language === 'ta' ? 'ta-IN' : 'en-US';
-      utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setIsSupported(false);
+      return;
     }
-  };
 
-  const showFeedback = (text) => {
-    setFeedback(text);
-    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-    feedbackTimeoutRef.current = setTimeout(() => {
-      setFeedback('');
-    }, 5000);
-  };
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = language === 'ta' ? 'ta-IN' : 'en-US';
+
+    recognition.onresult = (event) => {
+      const current = event.resultIndex;
+      const resultTranscript = event.results[current][0].transcript.toLowerCase().trim();
+      setTranscript(resultTranscript);
+
+      if (event.results[current].isFinal) {
+        handleCommand(resultTranscript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      // Re-start if it was supposed to be listening
+      if (isListening) {
+        recognition.start();
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    // IMPORTANT: If we were already listening when language changed, restart it
+    if (isListening) {
+      try {
+        recognition.start();
+      } catch (_) {
+        console.warn('Recognition already started');
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) { /* ignore */ }
+      }
+    };
+  }, [language, isListening, handleCommand]);
 
   const toggleListening = () => {
     if (!isSupported) return;
