@@ -223,7 +223,9 @@ export default function TamilVoiceAssistant({
     } else {
       // ── Request mic permission first ──
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // ✅ CRITICAL: Stop the manual hardware tracks so the SpeechRecognition engine can actually use the mic!
+        stream.getTracks().forEach(t => t.stop());
       } catch (err) {
         console.error('[Mic] Permission denied:', err);
         setPermissionDenied(true);
@@ -234,7 +236,7 @@ export default function TamilVoiceAssistant({
       try {
         isListeningRef.current = true;
         recognitionRef.current?.start();
-        speak(t.hello);
+        // ❌ Do NOT speak 'hello' here. If the speaker talks, the microphone hears its own voice and instantly fails.
       } catch (err) {
         if (err.name === 'InvalidStateError') {
           // Already running — just update state
