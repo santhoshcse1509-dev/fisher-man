@@ -28,7 +28,7 @@ app.use(cors({
 }));
 
 // ── Health check ────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'ok',
     smsProvider: process.env.FAST2SMS_API_KEY ? 'fast2sms' : 'not configured',
@@ -47,7 +47,7 @@ app.get('/api/health', (req, res) => {
  *   language: 'en' | 'ta'
  * }
  */
-app.post('/api/send-sos', async (req, res) => {
+app.post(['/api/send-sos', '/send-sos'], async (req, res) => {
   const { numbers, fishermanName, lat, lng, language } = req.body;
 
   // Validate required fields
@@ -186,7 +186,7 @@ app.post('/api/send-sos', async (req, res) => {
  *   language: 'en' | 'ta'
  * }
  */
-app.post('/api/send-storm-alert', async (req, res) => {
+app.post(['/api/send-storm-alert', '/send-storm-alert'], async (req, res) => {
   const { numbers, fishermanName, lat, lng, windSpeed, waveHeight, stormLevel, language } = req.body;
 
   if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {

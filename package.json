@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"VITE,SERVER\" -c \"cyan,yellow\" \"vite\" \"node server/index.js\"",
+    "dev": "concurrently -n \"VITE,SERVER\" -c \"cyan,yellow\" \"vite\" \"node api/index.js\"",
     "dev:vite": "vite",
-    "dev:server": "node server/index.js",
+    "dev:server": "node api/index.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
