@@ -3,6 +3,7 @@ import { BORDER_POINTS } from '../utils/geo';
 import L from 'leaflet';
 import { useEffect } from 'react';
 import OfflineTileLayer from './OfflineTileLayer';
+import CycloneLayer from './CycloneLayer';
 
 // Custom marker icon using embedded SVG (works offline)
 const createMarkerIcon = () => {
@@ -47,7 +48,7 @@ function MapController({ position, isFollowing, onUserInteraction, onMapClick })
   return null;
 }
 
-export default function MapVisualizer({ position, status, isFollowing, setIsFollowing, savedSpots = [], onRemoveSpot, navigationTarget, onMapClick }) {
+export default function MapVisualizer({ position, status, isFollowing, setIsFollowing, savedSpots = [], onRemoveSpot, navigationTarget, onMapClick, language }) {
   const borderLine = BORDER_POINTS.map(p => [p.lat, p.lng]);
   
   const statusColor = {
@@ -82,6 +83,9 @@ export default function MapVisualizer({ position, status, isFollowing, setIsFoll
       >
         {/* Offline-capable tile layer */}
         <OfflineTileLayer />
+
+        {/* Cyclone tracker overlay */}
+        <CycloneLayer position={position} language={language} />
         
         {/* Border Line */}
         <Polyline 

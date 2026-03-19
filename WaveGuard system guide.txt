@@ -1,4 +1,4 @@
-fisherman alert system guide:
+WaveGuard system guide:
 
 1. open the terminal
 

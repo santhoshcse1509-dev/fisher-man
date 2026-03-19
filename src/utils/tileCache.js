@@ -1,5 +1,5 @@
 /**
- * Offline Tile Cache System for Fisherman Alert
+ * Offline Tile Cache System for WaveGuard
  * Uses IndexedDB to store map tiles for offline use
  */
 

@@ -181,3 +181,53 @@ body {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+/* =============================================
+   CYCLONE / STORM ANIMATIONS
+   ============================================= */
+
+/* Slow spin for cyclone icon on map */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 4s linear infinite;
+  display: inline-block;
+}
+
+/* Leaflet cyclone icon internal spin */
+.leaflet-div-icon div {
+  animation: spin-slow 4s linear infinite;
+}
+
+/* Storm banner slide down from top */
+@keyframes slide-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.storm-banner-enter {
+  animation: slide-down 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Subtle bounce for storm emoji */
+@keyframes bounce-slight {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+
+.animate-bounce-slight {
+  animation: bounce-slight 2s ease-in-out infinite;
+}
+
+/* Cyclone-level purple glow pulse */
+@keyframes glow-purple {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
+  50%       { box-shadow: 0 0 20px 8px rgba(124, 58, 237, 0.25); }
+}
+
+.animate-glow-cyclone {
+  animation: glow-purple 1.5s ease-in-out infinite;
+}

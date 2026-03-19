@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MapVisualizer from './components/MapVisualizer';
 import Compass from './components/Compass';
 import Auth from './components/Auth';
 import Profile from './components/Profile';
 import WeatherWidget from './components/WeatherWidget';
+import StormBanner from './components/StormBanner';
 import HistoryPanel from './components/HistoryPanel';
 import OfflineMapManager from './components/OfflineMapManager';
 import TamilVoiceAssistant from './components/TamilVoiceAssistant';
 import { getDistanceToBorder, getStatus, calculateDistance, getSafeDirection } from './utils/geo';
 import { useAdvancedLocation } from './hooks/useAdvancedLocation';
 import { sendSosAlert } from './services/sosAlert';
+import { fetchMarineWeather } from './services/weatherService';
 
 import {
   AlertTriangle, ShieldCheck, Siren, Navigation, Volume2, VolumeX,
@@ -63,6 +65,11 @@ function App() {
   // SMS sending status: 'idle' | 'sending' | 'sent' | 'fallback'
   const [smsSendStatus, setSmsSendStatus] = useState('idle');
   const [smsSentCount, setSmsSentCount] = useState(0);
+
+  // ── Weather & Storm state ──────────────────────────────────────────────────
+  const [weather, setWeather] = useState(null);
+  const [stormAlertSentLevel, setStormAlertSentLevel] = useState(null);
+  const weatherPollRef = useRef(null);
 
   // ── NEW: hamburger menu state ──────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
@@ -119,6 +126,81 @@ function App() {
       Notification.requestPermission();
     }
   }, []);
+
+  // ── Real weather polling (every 10 minutes) ────────────────────────────────
+  const refreshWeather = useCallback(async (lat, lng) => {
+    try {
+      const data = await fetchMarineWeather(lat, lng);
+      setWeather(data);
+    } catch (err) {
+      console.warn('[Weather] Poll failed:', err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    // Fetch immediately with current position
+    refreshWeather(position.lat, position.lng);
+    // Re-fetch every 10 minutes
+    weatherPollRef.current = setInterval(() => {
+      refreshWeather(position.lat, position.lng);
+    }, 10 * 60 * 1000);
+    return () => clearInterval(weatherPollRef.current);
+  }, [user, position, refreshWeather]);
+
+  // Re-fetch weather when position changes significantly (> 5km)
+  const lastWeatherPos = useRef({ lat: null, lng: null });
+  useEffect(() => {
+    if (!user || !position) return;
+    const prev = lastWeatherPos.current;
+    const moved = prev.lat === null ||
+      Math.abs(position.lat - prev.lat) > 0.05 ||
+      Math.abs(position.lng - prev.lng) > 0.05;
+    if (moved) {
+      lastWeatherPos.current = { lat: position.lat, lng: position.lng };
+      refreshWeather(position.lat, position.lng);
+    }
+  }, [position, user, refreshWeather]);
+
+  // ── Auto storm SMS (fires once per storm level escalation) ─────────────────
+  const sendStormAlertSms = useCallback(async (stormLevel) => {
+    if (stormAlertSentLevel === stormLevel) return; // already sent for this level
+    const saved = localStorage.getItem('fisher_profile');
+    if (!saved || !weather) return;
+    const profile = JSON.parse(saved);
+    const numbers = [profile.family1, profile.family2, profile.police]
+      .map(n => n ? String(n).replace(/\D/g, '') : '')
+      .filter(n => n.length >= 10);
+    if (numbers.length === 0) return;
+
+    setStormAlertSentLevel(stormLevel);
+    try {
+      await fetch('/api/send-storm-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numbers,
+          fishermanName: profile.username || 'Fisher',
+          lat: position.lat,
+          lng: position.lng,
+          windSpeed: weather.windSpeed,
+          waveHeight: weather.waveHeight,
+          stormLevel,
+          language,
+        }),
+      });
+      console.log(`[Storm SMS] Sent ${stormLevel} alert to ${numbers.length} contacts`);
+    } catch (err) {
+      console.warn('[Storm SMS] Failed:', err.message);
+    }
+  }, [stormAlertSentLevel, weather, position, language]);
+
+  // Reset storm SMS lock when conditions return to safe
+  useEffect(() => {
+    if (weather?.stormInfo?.level === 'safe') {
+      setStormAlertSentLevel(null);
+    }
+  }, [weather]);
 
   useEffect(() => {
     localStorage.setItem('fisher_saved_spots', JSON.stringify(savedSpots));
@@ -441,6 +523,14 @@ function App() {
         </div>
       )}
 
+      {/* ── STORM BANNER ──────────────────────────────────────────────────── */}
+      <StormBanner
+        weather={weather}
+        language={language}
+        muted={muted}
+        onStormAlert={sendStormAlertSms}
+      />
+
       {/* ── MAP LAYER ─────────────────────────────────────────────────────── */}
       <div className={clsx(
         "absolute inset-0 z-0 transition-opacity duration-500",
@@ -456,6 +546,7 @@ function App() {
           onRemoveSpot={removeSavedSpot}
           navigationTarget={navigationTarget}
           onMapClick={handleMapClick}
+          language={language}
         />
       </div>
 
@@ -559,12 +650,14 @@ function App() {
 
       {/* ── TOP HEADER ────────────────────────────────────────────────────── */}
       {!sosMode && (
-        <div className={clsx(
-          "absolute top-0 w-full z-20 shadow-lg transition-colors duration-500 rounded-b-2xl sm:rounded-b-3xl backdrop-blur-md",
-          themeColors[status]
-        )}>
-          {/* ── Main bar ── */}
-          <div className="flex justify-between items-center px-3 sm:px-4 py-2.5 sm:py-3">
+        <div className="absolute top-0 w-full flex justify-center z-20 pointer-events-none px-0 sm:px-4">
+          <div className={clsx(
+            "w-full max-w-5xl shadow-lg transition-colors duration-500 sm:rounded-b-3xl backdrop-blur-md pointer-events-auto border-b sm:border-b-0 sm:mt-2",
+            themeColors[status]
+          )}>
+            {/* ── Main bar ── */}
+            <div className="flex justify-between items-center px-3 sm:px-6 py-2.5 sm:py-3.5">
+
 
             {/* Status info */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -713,6 +806,7 @@ function App() {
               </button>
             </div>
           </div>
+          </div>
         </div>
       )}
 
@@ -738,7 +832,11 @@ function App() {
       {/* ── FLOATING ACTION BUTTONS (Right) ───────────────────────────────── */}
       <div className="absolute right-3 sm:right-4 top-20 sm:top-28 z-20 flex flex-col gap-2 sm:gap-3 items-end">
         <div className="mb-1 relative">
-          <WeatherWidget isNight={nightMode} simulate={false} />
+          <WeatherWidget
+            isNight={nightMode}
+            weather={weather}
+            onRefresh={() => refreshWeather(position.lat, position.lng)}
+          />
         </div>
 
         {!isFollowing && (
@@ -862,25 +960,25 @@ function App() {
       )}
 
       {/* ── BOTTOM DASHBOARD ──────────────────────────────────────────────── */}
-      <div className="absolute bottom-0 w-full z-20 p-3 sm:p-4 pb-4 sm:pb-6">
+      <div className="absolute bottom-0 w-full z-20 p-3 sm:p-6 pb-5 sm:pb-8 flex flex-col items-center pointer-events-none">
 
         {/* Status bar (GPS + mute) */}
-        <div className="flex justify-between items-center mb-2 sm:mb-4 px-1">
+        <div className="flex justify-between items-center w-full max-w-5xl mb-2 sm:mb-4 px-1 pointer-events-auto">
           <button
             id="mute-btn"
             onClick={() => setMuted(!muted)}
-            className="bg-white/90 text-slate-800 p-2 rounded-full shadow-lg border border-slate-200 touch-target"
+            className="bg-white/90 text-slate-800 p-2 sm:p-2.5 rounded-full shadow-xl border border-slate-200 touch-target transition-transform active:scale-90"
             aria-label={muted ? 'Unmute' : 'Mute'}
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
 
-          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-white text-xs font-mono">
+          <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white text-xs sm:text-sm font-mono shadow-xl border border-white/10">
             {gpsAccuracy
               ? (gpsAccuracy < 20
-                ? <SignalHigh size={13} className="text-emerald-400" />
-                : <SignalLow size={13} className="text-amber-400" />)
-              : <Signal size={13} className="text-red-400 animate-pulse" />
+                ? <SignalHigh size={14} className="text-emerald-400" />
+                : <SignalLow size={14} className="text-amber-400" />)
+              : <Signal size={14} className="text-red-400 animate-pulse" />
             }
             <span className="uppercase">{advLoc.source}: {gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'SEARCHING'}</span>
           </div>
@@ -888,8 +986,8 @@ function App() {
 
         {/* Dashboard card */}
         <div className={clsx(
-          "rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-2xl border backdrop-blur-md transition-colors duration-500",
-          "grid grid-cols-2 gap-3 sm:gap-4",
+          "w-full max-w-5xl rounded-3xl p-4 sm:p-6 shadow-2xl border backdrop-blur-xl transition-colors duration-500 pointer-events-auto",
+          "grid grid-cols-2 gap-4 sm:gap-6",
           nightMode
             ? "bg-slate-800/95 border-slate-700 text-white"
             : "bg-white/95 border-white/60 text-slate-800"

@@ -1,5 +1,5 @@
 /**
- * Location Service for Fisherman Alert
+ * Location Service for WaveGuard
  * Contains business logic for maritime-specific location validation
  */
 

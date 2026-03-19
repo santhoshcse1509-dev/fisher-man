@@ -18,8 +18,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['vite.svg'],
       manifest: {
-        name: 'Fisherman Border Alert',
-        short_name: 'BorderAlert',
+        name: 'WaveGuard',
+        short_name: 'WaveGuard',
         description: 'Alerts fishermen when nearing international borders',
         theme_color: '#0ea5e9',
         background_color: '#0c4a6e',

@@ -1,16 +1,64 @@
-# React + Vite
+# 🌊 WaveGuard: Maritime Safety & Border Alert System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+WaveGuard is an advanced, offline-capable maritime safety web application designed specifically for fishermen. It prevents international maritime boundary line (IMBL) crossings, tracks approaching storms and cyclones, provides SOS alerts to family members, and functions beautifully even when far out at sea without an internet connection.
 
-Currently, two official plugins are available:
+## 🚀 Key Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Offline GPS Tracking:** Uses advanced device location APIs to track the boat even when there's no cellular network.
+- **IMBL Alerts:** Warns the user audibly and visually when they get too close to the international border (currently programmed for the India-Sri Lanka maritime border).
+- **Storm & Cyclone Radar:** Fetches marine data securely to warn against incoming squalls, rough seas, and cyclones. Renders predicted cyclone tracks on the map.
+- **Tamil & English Voice Assistant:** Fully hands-free operation designed for harsh marine environments. Voice prompts alert fishermen of borders and weather.
+- **Automated SOS SMS:** If a distress situation happens, an alert is sent directly to family and local authorities via Fast2SMS and Twilio fallback networks. 
+- **IoT Hardware Ready:** Supports integration with ESP32-based hardware for capsize detection, water leaks, and satellite communication for deep-sea fishing.
 
-## React Compiler
+## 🛠️ Built With
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend:** React 19, Vite, Tailwind CSS, Leaflet (Maps)
+- **Backend:** Node.js, Express (For SMS relay)
+- **APIs:** Open-Meteo Marine API, Fast2SMS API, Twilio API
 
-## Expanding the ESLint configuration
+## 🚦 Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+
+You will need **Node.js 18+** installed on your computer.
+
+### Installation
+
+1. Clone or download the repository.
+2. Navigate into the project directory:
+   ```bash
+   cd WaveGuard
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Set up your `.env` file in the `server` folder:
+   ```env
+   FAST2SMS_API_KEY=your_key_here
+   # Twilio setup is optional
+   TWILIO_ACCOUNT_SID=your_sid_here
+   TWILIO_AUTH_TOKEN=your_token_here
+   TWILIO_FROM_NUMBER=your_number_here
+   ```
+
+### Running the App Locally
+
+To start both the Vite frontend and Node backend simultaneously:
+
+```bash
+npm run dev
+```
+
+The app will be accessible at `http://localhost:5173`.
+
+## 📱 Progressive Web App (PWA)
+
+WaveGuard is built as a PWA. When running on a mobile device, fishermen can "Add to Home Screen" directly from Chrome or Safari. Map tiles are cached via IndexedDB, ensuring the application continues to provide map directions even 20 kilometers off the coast.
+
+## 🤝 Hardware Integration
+
+WaveGuard is designed to talk to an external microcontroller (like an ESP32) mounted securely in the boat string.
+
+Type **"start hardware part"** in your setup assistant to get the complete wiring diagram, BOM (Bill of Materials), and Arduino code firmware for the hardware unit.

@@ -1,6 +1,6 @@
 /* eslint-env node */
 /**
- * FishermanAlert — SOS SMS Backend Server
+ * WaveGuard — SOS SMS Backend Server
  * ----------------------------------------
  * Provides a REST API for automated SMS alerts via Fast2SMS.
  * Runs on port 3001, proxied through Vite on /api/*
@@ -172,9 +172,90 @@ app.post('/api/send-sos', async (req, res) => {
   return res.status(500).json({ success: false, error: 'All SMS providers failed' });
 });
 
+// ── Storm Alert SMS Endpoint ────────────────────────────────────────────────
+/**
+ * POST /api/send-storm-alert
+ * Body: {
+ *   numbers: string[]       — array of mobile numbers
+ *   fishermanName: string
+ *   lat: number
+ *   lng: number
+ *   windSpeed: number       — km/h
+ *   waveHeight: number      — metres
+ *   stormLevel: string      — 'rough'|'storm'|'cyclone'
+ *   language: 'en' | 'ta'
+ * }
+ */
+app.post('/api/send-storm-alert', async (req, res) => {
+  const { numbers, fishermanName, lat, lng, windSpeed, waveHeight, stormLevel, language } = req.body;
+
+  if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+    return res.status(400).json({ success: false, error: 'No phone numbers provided' });
+  }
+
+  const cleanNumbers = numbers
+    .map(n => String(n).replace(/\D/g, ''))
+    .filter(n => n.length >= 10);
+
+  if (cleanNumbers.length === 0) {
+    return res.status(400).json({ success: false, error: 'No valid phone numbers' });
+  }
+
+  const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+  const levelLabel = stormLevel === 'cyclone' ? '🌀 CYCLONE ALERT' :
+                     stormLevel === 'storm'   ? '⛈️ STORM WARNING' : '🌊 ROUGH SEA WARNING';
+
+  const message = language === 'ta'
+    ? `${levelLabel}: மீனவர் ${fishermanName || 'மீனவர்'} கடலில் உள்ளார். காற்று: ${windSpeed} km/h, அலை: ${waveHeight}m. இடம்: ${mapsLink}. உடனே தொடர்பு கொள்ளவும்!`
+    : `${levelLabel}: Fisherman ${fishermanName || 'Fisher'} is at sea. Wind: ${windSpeed} km/h, Waves: ${waveHeight}m. Location: ${mapsLink}. Please contact immediately!`;
+
+  console.log(`[Storm] ${stormLevel} alert to ${cleanNumbers.length} number(s)`);
+
+  // Try Fast2SMS first
+  if (process.env.FAST2SMS_API_KEY) {
+    try {
+      const response = await axios.post(
+        'https://www.fast2sms.com/dev/bulkV2',
+        { route: 'q', message, language: 'english', flash: 0, numbers: cleanNumbers.join(',') },
+        { headers: { authorization: process.env.FAST2SMS_API_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
+      );
+      if (response.data.return === true) {
+        return res.json({ success: true, provider: 'fast2sms', sent: cleanNumbers.length });
+      }
+    } catch (err) {
+      console.error('[Storm/Fast2SMS] Error:', err.response?.data || err.message);
+    }
+  }
+
+  // Try Twilio fallback
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER) {
+    try {
+      const twilioClient = axios.create({
+        baseURL: `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}`,
+        auth: { username: process.env.TWILIO_ACCOUNT_SID, password: process.env.TWILIO_AUTH_TOKEN },
+        timeout: 10000,
+      });
+      const results = await Promise.allSettled(
+        cleanNumbers.map(num =>
+          twilioClient.post('/Messages.json', new URLSearchParams({
+            To: `+91${num}`, From: process.env.TWILIO_FROM_NUMBER, Body: message,
+          }))
+        )
+      );
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      return res.json({ success: successCount > 0, provider: 'twilio', sent: successCount });
+    } catch (err) {
+      console.error('[Storm/Twilio] Error:', err.response?.data || err.message);
+    }
+  }
+
+  // No provider configured — return demo mode
+  return res.json({ success: false, provider: 'none', demoMode: true });
+});
+
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🚨 FishermanAlert SOS Server running on http://localhost:${PORT}`);
+  console.log(`\n🚨 WaveGuard SOS Server running on http://localhost:${PORT}`);
   console.log(`   Fast2SMS: ${process.env.FAST2SMS_API_KEY ? '✅ Configured' : '⚠️  Not configured (add to server/.env)'}`);
   console.log(`   Twilio:   ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : '⚠️  Not configured (optional fallback)'}\n`);
 });

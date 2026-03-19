@@ -1,0 +1,20 @@
+[0m[0m
+[0m[4mC:\Users\sanja\OneDrive\Desktop\FishermanAlert\src\App.jsx[24m[0m
+[0m  [2m149:3[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')[0m
+[0m[0m
+[0m[4mC:\Users\sanja\OneDrive\Desktop\FishermanAlert\src\components\CycloneLayer.jsx[24m[0m
+[0m  [2m109:50[22m  [31merror[39m  'language' is assigned a value but never used                                                                                   [2mno-unused-vars[22m[0m
+[0m  [2m112:9[22m   [31merror[39m  'map' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                             [2mno-unused-vars[22m[0m
+[0m  [2m202:10[22m  [31merror[39m  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  [2mreact-refresh/only-export-components[22m[0m
+[0m[0m
+[0m[4mC:\Users\sanja\OneDrive\Desktop\FishermanAlert\src\components\StormBanner.jsx[24m[0m
+[0m  [2m22:9[22m  [31merror[39m  'announcedRef' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4mC:\Users\sanja\OneDrive\Desktop\FishermanAlert\src\components\TamilVoiceAssistant.jsx[24m[0m
+[0m  [2m150:57[22m  [31merror[39m  Empty block statement  [2mno-empty[22m[0m
+[0m  [2m209:19[22m  [31merror[39m  Empty block statement  [2mno-empty[22m[0m
+[0m  [2m221:58[22m  [31merror[39m  Empty block statement  [2mno-empty[22m[0m
+[0m[0m
+[0m[31m[1m✖ 8 problems (7 errors, 1 warning)[22m[39m[0m
+[0m[31m[1m[22m[39m[31m[1m  0 errors and 1 warning potentially fixable with the `--fix` option.[22m[39m[0m
+[0m[31m[1m[22m[39m[0m

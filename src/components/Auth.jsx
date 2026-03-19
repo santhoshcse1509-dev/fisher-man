@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ship, Waves, Lock, User, ArrowRight, Anchor } from 'lucide-react';
+import { Shield, Waves, Lock, User, ArrowRight, Anchor } from 'lucide-react';
 
 export default function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -32,13 +32,21 @@ export default function Auth({ onLogin }) {
 
         {/* Brand header */}
         <div className="flex flex-col items-center mb-6 sm:mb-8">
-          <div className="p-3 sm:p-4 bg-blue-600 rounded-xl sm:rounded-2xl shadow-lg mb-3 sm:mb-4">
-            <Ship size={36} className="text-white sm:hidden" />
-            <Ship size={48} className="text-white hidden sm:block" />
+          <div className="relative p-3 sm:p-4 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl sm:rounded-3xl shadow-[0_0_30px_rgba(6,182,212,0.5)] mb-3 sm:mb-4">
+            {/* Desktop Icon */}
+            <div className="hidden sm:block relative">
+              <Shield size={48} className="text-white stroke-[1.5]" />
+              <Waves size={24} className="text-white absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 stroke-[2.5]" />
+            </div>
+            {/* Mobile Icon */}
+            <div className="sm:hidden relative">
+              <Shield size={36} className="text-white stroke-[1.5]" />
+              <Waves size={18} className="text-white absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 stroke-[2.5]" />
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-center">
-            Fisherman Alert
-          </h1>
+          <h2 className="mt-6 text-2xl font-black text-white px-2">
+            WaveGuard
+          </h2>
           <p className="text-blue-200 text-xs sm:text-sm font-medium mt-1 text-center">
             Maritime Safety System
           </p>
@@ -142,7 +150,7 @@ export default function Auth({ onLogin }) {
       {/* Footer brand mark */}
       <div className="z-10 mt-4 flex items-center gap-2 opacity-40">
         <Anchor size={14} className="text-blue-300" />
-        <span className="text-xs text-blue-300 font-bold tracking-widest uppercase">FisherSafe v1.0</span>
+        <span className="text-xs text-blue-300 font-bold tracking-widest uppercase">WaveGuard v1.0</span>
       </div>
     </div>
   );
