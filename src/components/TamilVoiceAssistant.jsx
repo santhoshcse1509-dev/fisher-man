@@ -211,7 +211,7 @@ export default function TamilVoiceAssistant({
     };
   }, [language, handleCommand, showFeedback]); // ✅ Only re-create when language changes
 
-  const toggleListening = async () => {
+  const toggleListening = () => {
     if (!isSupported || permissionDenied) return;
 
     if (isListening) {
@@ -221,22 +221,12 @@ export default function TamilVoiceAssistant({
       setIsListening(false);
       setTranscript('');
     } else {
-      // ── Request mic permission first ──
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // ✅ CRITICAL: Stop the manual hardware tracks so the SpeechRecognition engine can actually use the mic!
-        stream.getTracks().forEach(t => t.stop());
-      } catch (err) {
-        console.error('[Mic] Permission denied:', err);
-        setPermissionDenied(true);
-        showFeedback(t.permissionDenied);
-        return;
-      }
-
+      // 🚀 CRITICAL: Do NOT use async/await here! Mobile browsers (Android/iOS) will BLOCK the 
+      // SpeechRecognition API if .start() is not called synchronously inside the onClick event!
+      // The recognition.start() function automatically handles the Permission Popup by itself.
       try {
         isListeningRef.current = true;
         recognitionRef.current?.start();
-        // ❌ Do NOT speak 'hello' here. If the speaker talks, the microphone hears its own voice and instantly fails.
       } catch (err) {
         if (err.name === 'InvalidStateError') {
           // Already running — just update state
