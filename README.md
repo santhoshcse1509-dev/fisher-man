@@ -34,7 +34,7 @@ You will need **Node.js 18+** installed on your computer.
    ```bash
    npm install
    ```
-4. Set up your `.env` file in the `server` folder:
+4. Set up your `.env` file in the `api` folder:
    ```env
    FAST2SMS_API_KEY=your_key_here
    # Twilio setup is optional
@@ -56,6 +56,15 @@ The app will be accessible at `http://localhost:5173`.
 ## 📱 Progressive Web App (PWA)
 
 WaveGuard is built as a PWA. When running on a mobile device, fishermen can "Add to Home Screen" directly from Chrome or Safari. Map tiles are cached via IndexedDB, ensuring the application continues to provide map directions even 20 kilometers off the coast.
+
+## 🌐 Cloud Deployment (Vercel)
+
+WaveGuard is architected to run seamlessly on Vercel as a **Vite Frontend + Serverless Backend**:
+
+1. Push your code to a GitHub repository.
+2. Link the repository to your Vercel Dashboard.
+3. **CRITICAL:** Add your `FAST2SMS_API_KEY` to Vercel's **Environment Variables** in the project settings.
+4. Deploy! Your SOS automation will now work in the cloud without needing a separate backend server.
 
 ## 🤝 Hardware Integration
 
