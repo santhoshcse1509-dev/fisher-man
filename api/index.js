@@ -133,10 +133,14 @@ app.post(['/api/send-sos', '/send-sos'], async (req, res) => {
     return res.status(400).json({ success: false, error: 'Location coordinates required' });
   }
 
-  // Clean phone numbers (digits only)
-  const cleanNumbers = numbers
-    .map(n => String(n).replace(/\D/g, ''))
-    .filter(n => n.length >= 10);
+  // Clean phone numbers (digits only and deduplicated)
+  const cleanNumbers = Array.from(
+    new Set(
+      numbers
+        .map(n => String(n).replace(/\D/g, ''))
+        .filter(n => n.length >= 10)
+    )
+  );
 
   if (cleanNumbers.length === 0) {
     return res.status(400).json({ success: false, error: 'No valid phone numbers after cleaning' });
@@ -235,19 +239,14 @@ app.post(['/api/send-sos', '/send-sos'], async (req, res) => {
     }
   }
 
-  // ── No provider configured ─────────────────────────────────────────────────
-  if (!process.env.FAST2SMS_API_KEY && !process.env.TWILIO_ACCOUNT_SID) {
-    console.warn('[SOS] No SMS provider configured. Add FAST2SMS_API_KEY to server/.env');
-    // Return a "demo" success so the frontend still shows the SOS UI correctly
-    return res.json({
-      success: false,
-      provider: 'none',
-      error: 'No SMS API key configured. Add FAST2SMS_API_KEY to server/.env',
-      demoMode: true,
-    });
-  }
-
-  return res.status(500).json({ success: false, error: 'All SMS providers failed' });
+  // ── No provider configured or providers failed ───────────────────────────
+  console.warn('[SOS] Cloud SMS provider unconfigured/failed. Falling back to native SMS.');
+  return res.json({
+    success: false,
+    provider: 'fallback',
+    error: 'Cloud SMS providers unavailable. Using native device SMS.',
+    demoMode: true,
+  });
 });
 
 // ── Storm Alert SMS Endpoint ────────────────────────────────────────────────

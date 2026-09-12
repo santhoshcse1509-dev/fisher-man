@@ -61,15 +61,19 @@ function openSmsLink(url) {
  * }>}
  */
 export async function sendSosAlert({ profile, position, language }) {
-  // ── 1. Gather numbers from profile ───────────────────────────────────────
-  const rawNumbers = [
-    profile.mobile,
-    profile.family1,
-    profile.family2,
-    profile.police,
-  ]
-    .map(cleanNumber)
-    .filter(n => n.length >= 10);
+  // ── 1. Gather numbers from profile and deduplicate ────────────────────────
+  const rawNumbers = Array.from(
+    new Set(
+      [
+        profile.mobile,
+        profile.family1,
+        profile.family2,
+        profile.police,
+      ]
+        .map(cleanNumber)
+        .filter(n => n.length >= 10)
+    )
+  );
 
   const displayNumbers = [
     profile.mobile  ? `${profile.mobile} (அவர்கள்/Self)` : null,
