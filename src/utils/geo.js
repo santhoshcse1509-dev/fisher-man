@@ -156,3 +156,19 @@ export const getStatus = (distanceInMeters) => {
   if (distanceInMeters < 30000) return 'warning'; // < 30 km
   return 'safe';
 };
+
+/**
+ * Safely calls navigator.vibrate only when supported and user activation permits it
+ */
+export const safeVibrate = (pattern) => {
+  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      const hasActivation = navigator.userActivation ? navigator.userActivation.hasBeenActive : true;
+      if (hasActivation) {
+        navigator.vibrate(pattern);
+      }
+    } catch (_e) {
+      // Ignore intervention warning when browser suppresses automated vibration
+    }
+  }
+};

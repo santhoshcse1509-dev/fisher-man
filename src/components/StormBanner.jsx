@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Wind, Waves, Thermometer, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import clsx from 'clsx';
+import { safeVibrate } from '../utils/geo';
 
 export default function StormBanner({
   weather,          // object from weatherService.fetchMarineWeather
@@ -52,12 +53,10 @@ export default function StormBanner({
         });
       }
 
-      // Vibrate device
-      if ('vibrate' in navigator) {
-        if (level === 'cyclone') navigator.vibrate([800, 300, 800, 300, 800]);
-        else if (level === 'storm') navigator.vibrate([500, 200, 500]);
-        else navigator.vibrate([300, 100, 300]);
-      }
+      // Vibrate device safely
+      if (level === 'cyclone') safeVibrate([800, 300, 800, 300, 800]);
+      else if (level === 'storm') safeVibrate([500, 200, 500]);
+      else safeVibrate([300, 100, 300]);
 
       // Notify parent
       onStormAlert?.(level);

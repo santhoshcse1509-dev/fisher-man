@@ -8,7 +8,7 @@ import StormBanner from './components/StormBanner';
 import HistoryPanel from './components/HistoryPanel';
 import OfflineMapManager from './components/OfflineMapManager';
 import TamilVoiceAssistant from './components/TamilVoiceAssistant';
-import { getDistanceToBorder, getStatus, calculateDistance, getSafeDirection } from './utils/geo';
+import { getDistanceToBorder, getStatus, calculateDistance, getSafeDirection, safeVibrate } from './utils/geo';
 import { useAdvancedLocation } from './hooks/useAdvancedLocation';
 import { useOfflineStormDetector } from './hooks/useOfflineStormDetector';
 import { sendSosAlert } from './services/sosAlert';
@@ -292,19 +292,19 @@ function App() {
       if (newStatus === 'danger') {
         speak(translations[language].danger);
         if (!muted) sirenSound.play();
-        if ("vibrate" in navigator) navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 1000]);
+        safeVibrate([1000, 500, 1000, 500, 1000, 500, 1000]);
         if (!sosMode) setSosMode(true);
         if (!alertSent) setAlertSent(true);
       } else {
         sirenSound.stop();
         if (newStatus === 'warning') {
           speak(translations[language].warning);
-          if ("vibrate" in navigator) navigator.vibrate([400, 200, 400]);
+          safeVibrate([400, 200, 400]);
         }
         if (newStatus === 'safe') {
           setAlertSent(false);
           setSosMode(false);
-          if ("vibrate" in navigator) navigator.vibrate(0);
+          safeVibrate(0);
           speak(translations[language].statusSafe);
         }
       }
@@ -327,7 +327,7 @@ function App() {
     }
     return () => {
       sirenSound.stop();
-      if ("vibrate" in navigator) navigator.vibrate(0);
+      safeVibrate(0);
     };
      
   }, [position, language, user, status]);
@@ -341,7 +341,7 @@ function App() {
       speak(language === 'ta' 
         ? "எச்சரிக்கை! வளிமண்டல அழுத்தம் குறைகிறது! புயல் வருகிறது!" 
         : "Warning! Sudden pressure drop detected. Cyclone approaching!");
-      if ("vibrate" in navigator) navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 1000]);
+      safeVibrate([1000, 500, 1000, 500, 1000, 500, 1000]);
       if (!muted) sirenSound.play();
       setSosMode(true);
       setTimeout(() => clearAlert(), 10000); // Clear alert flag after triggering
@@ -495,7 +495,7 @@ function App() {
       const playAlert = () => {
         if (toggle) speak("ஆபத்து.. உதவி தேவை..", 'ta-IN');
         else speak("SOS.. Help Needed..", 'en-US');
-        if ("vibrate" in navigator) navigator.vibrate([1000, 300, 1000, 300, 1000]);
+        safeVibrate([1000, 300, 1000, 300, 1000]);
         toggle = !toggle;
       };
       playAlert();
@@ -504,7 +504,7 @@ function App() {
       // Reset on SOS stop
       if (sosIntervalRef.current) clearInterval(sosIntervalRef.current);
       window.speechSynthesis.cancel();
-      if ("vibrate" in navigator) navigator.vibrate(0);
+      safeVibrate(0);
       sirenSound.stop();
       setSmsSendStatus('idle');
       fetch('/api/clear-sos', { method: 'POST' }).catch(() => {});
@@ -515,13 +515,9 @@ function App() {
 
   const toggleSOS = () => {
     if (!sosMode) {
-      if ("vibrate" in navigator) {
-        navigator.vibrate([1000, 300, 1000, 300, 1000]);
-      }
+      safeVibrate([1000, 300, 1000, 300, 1000]);
     } else {
-      if ("vibrate" in navigator) {
-        navigator.vibrate(0);
-      }
+      safeVibrate(0);
     }
     setSosMode(!sosMode);
   };
@@ -538,7 +534,7 @@ function App() {
 
   const triggerTestAlert = () => {
     speak(translations[language].sysAlertTest);
-    if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+    safeVibrate([200, 100, 200]);
     setTimeout(() => {
       if (!muted) { sirenSound.play(); setTimeout(() => sirenSound.stop(), 2000); }
     }, 2000);
