@@ -75,25 +75,38 @@ const CachedTileLayer = L.TileLayer.extend({
     }
   },
   
+  getTileUrl: function(coords) {
+    if (!coords || !Number.isFinite(coords.z) || !Number.isFinite(coords.x) || !Number.isFinite(coords.y)) {
+      return '';
+    }
+    return OSM_TILE_URL
+      .replace('{z}', coords.z)
+      .replace('{x}', coords.x)
+      .replace('{y}', coords.y);
+  },
+
   _loadOnlineTile: function(tile, coords, done) {
-    if (this._isOffline) {
-      // Show placeholder for uncached tiles when offline
+    const { x, y, z } = coords || {};
+    if (this._isOffline || !Number.isFinite(z) || !Number.isFinite(x) || !Number.isFinite(y)) {
       tile.src = this._createPlaceholderTile();
       done(null, tile);
       return;
     }
     
-    // Use standard online loading
+    // Use custom online loading
     const url = this.getTileUrl(coords);
+    if (!url) {
+      tile.src = this._createPlaceholderTile();
+      done(null, tile);
+      return;
+    }
     
     tile.onload = () => {
       done(null, tile);
     };
     
     tile.onerror = () => {
-      // Try fallback URL
-      const fallbackUrl = this._getFallbackUrl(coords);
-      tile.src = fallbackUrl || this._createPlaceholderTile();
+      tile.src = this._createPlaceholderTile();
       done(null, tile);
     };
     
