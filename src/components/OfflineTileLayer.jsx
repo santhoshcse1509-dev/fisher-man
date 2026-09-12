@@ -34,9 +34,14 @@ const CachedTileLayer = L.TileLayer.extend({
     tile.setAttribute('role', 'presentation');
     tile.alt = '';
     
-    const { x, y } = coords;
-    const z = coords.z;
+    const { x, y, z } = coords;
     
+    if (!Number.isFinite(z) || !Number.isFinite(x) || !Number.isFinite(y)) {
+      tile.src = this._createPlaceholderTile();
+      done(null, tile);
+      return tile;
+    }
+
     // Try to load from cache first
     this._loadTileFromCache(tile, z, x, y, coords, done);
     
@@ -96,6 +101,9 @@ const CachedTileLayer = L.TileLayer.extend({
   },
   
   _getFallbackUrl: function(coords) {
+    if (!coords || !Number.isFinite(coords.z) || !Number.isFinite(coords.x) || !Number.isFinite(coords.y)) {
+      return null;
+    }
     return OSM_TILE_URL
       .replace('{z}', coords.z)
       .replace('{x}', coords.x)

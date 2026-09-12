@@ -15,42 +15,35 @@ import L from 'leaflet';
 /** Fetch active cyclone data for Bay of Bengal / Arabian Sea region */
 async function fetchActiveCyclones(lat, lng) {
   try {
-    // Check Open-Meteo for extreme wind conditions in a 500km radius
-    // We check multiple grid points to simulate "is there a cyclone nearby?"
-    const offsets = [
-      { dlat:  2, dlng:  0 },
-      { dlat: -2, dlng:  0 },
-      { dlat:  0, dlng:  2 },
-      { dlat:  0, dlng: -2 },
-      { dlat:  3, dlng:  3 },
-      { dlat: -3, dlng: -3 },
-    ];
+    // Check Open-Meteo for extreme wind conditions in regional grid points using a single batch request
+    const checkLats = [lat, lat + 2, lat - 2, lat, lat, lat + 3, lat - 3];
+    const checkLngs = [lng, lng, lng, lng + 2, lng - 2, lng + 3, lng - 3];
 
-    const checks = await Promise.allSettled(
-      offsets.map(({ dlat, dlng }) => {
-        const checkLat = (lat + dlat).toFixed(2);
-        const checkLng = (lng + dlng).toFixed(2);
-        const params = new URLSearchParams({
-          latitude: checkLat,
-          longitude: checkLng,
-          hourly: 'wind_speed_10m,wind_direction_10m',
-          forecast_days: 2,
-          wind_speed_unit: 'kmh',
-        });
-        return fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
-          signal: AbortSignal.timeout(6000),
-        }).then(r => r.json()).then(d => {
-          const maxWind = Math.max(...(d.hourly?.wind_speed_10m?.slice(0, 24) ?? [0]));
-          const dir = d.hourly?.wind_direction_10m?.[0] ?? 0;
-          return { lat: lat + dlat, lng: lng + dlng, maxWind, dir };
-        });
-      })
-    );
+    const params = new URLSearchParams({
+      latitude: checkLats.map(l => l.toFixed(2)).join(','),
+      longitude: checkLngs.map(l => l.toFixed(2)).join(','),
+      hourly: 'wind_speed_10m,wind_direction_10m',
+      forecast_days: 2,
+      wind_speed_unit: 'kmh',
+    });
 
-    // Filter grid points with cyclone-level winds (> 63 km/h = Beaufort 8+)
-    const hotspots = checks
-      .filter(r => r.status === 'fulfilled' && r.value.maxWind >= 63)
-      .map(r => r.value);
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const dataArray = Array.isArray(data) ? data : [data];
+
+    const hotspots = [];
+    dataArray.forEach((d, idx) => {
+      const maxWind = Math.max(...(d.hourly?.wind_speed_10m?.slice(0, 24) ?? [0]));
+      const dir = d.hourly?.wind_direction_10m?.[0] ?? 0;
+      if (maxWind >= 63) {
+        hotspots.push({ lat: checkLats[idx], lng: checkLngs[idx], maxWind, dir });
+      }
+    });
 
     if (hotspots.length === 0) return [];
 
@@ -109,17 +102,22 @@ function makeCycloneIcon(category) {
 export default function CycloneLayer({ position }) {
   const [cyclones, setCyclones] = useState([]);
   const [loading, setLoading] = useState(false);
-  const lastCheckRef = useRef(0);
+  const lastCheckRef = useRef({ time: 0, lat: null, lng: null });
 
   useEffect(() => {
-    if (!position) return;
+    if (!position?.lat || !position?.lng) return;
 
     const now = Date.now();
-    // Check every 30 minutes
-    if (now - lastCheckRef.current < 30 * 60 * 1000) return;
+    const prev = lastCheckRef.current;
+    const moved = prev.lat === null ||
+      Math.abs(position.lat - prev.lat) > 0.5 ||
+      Math.abs(position.lng - prev.lng) > 0.5;
+
+    // Check every 30 minutes unless position moved significantly (> 50km)
+    if (!moved && now - prev.time < 30 * 60 * 1000) return;
 
     setLoading(true);
-    lastCheckRef.current = now;
+    lastCheckRef.current = { time: now, lat: position.lat, lng: position.lng };
 
     fetchActiveCyclones(position.lat, position.lng)
       .then(found => {

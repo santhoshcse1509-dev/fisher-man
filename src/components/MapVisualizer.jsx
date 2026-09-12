@@ -37,8 +37,12 @@ function MapController({ position, isFollowing, onUserInteraction, onMapClick })
   });
 
   useEffect(() => {
-    if (isFollowing) {
-      map.flyTo(position, map.getZoom(), {
+    if (isFollowing && position) {
+      const zoom = map.getZoom();
+      const safeZoom = (typeof zoom === 'number' && Number.isFinite(zoom) && zoom > 0) ? zoom : 13;
+      const targetLat = Number.isFinite(position.lat) ? position.lat : 9.28;
+      const targetLng = Number.isFinite(position.lng) ? position.lng : 79.3;
+      map.flyTo([targetLat, targetLng], safeZoom, {
         animate: true,
         duration: 2.0
       });

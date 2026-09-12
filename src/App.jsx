@@ -275,7 +275,6 @@ function App() {
       .filter(n => n.length >= 10);
     if (numbers.length === 0) return;
 
-    setStormAlertSentLevel(stormLevel);
     try {
       await fetch('/api/send-storm-alert', {
         method: 'POST',
@@ -301,7 +300,6 @@ function App() {
   useEffect(() => {
     if (weather?.stormInfo?.level === 'safe') {
       stormAlertSentLevelRef.current = null;
-      setStormAlertSentLevel(null);
     }
   }, [weather]);
 
