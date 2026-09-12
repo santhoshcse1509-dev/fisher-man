@@ -161,7 +161,6 @@ function App() {
 
   // ── Weather & Storm state ──────────────────────────────────────────────────
   const [weather, setWeather] = useState(null);
-  const [stormAlertSentLevel, setStormAlertSentLevel] = useState(null);
 
   // ── NEW: hamburger menu state ──────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
@@ -264,8 +263,10 @@ function App() {
   }, [position, user, refreshWeather]);
 
   // ── Auto storm SMS (fires once per storm level escalation) ─────────────────
+  const stormAlertSentLevelRef = useRef(null);
   const sendStormAlertSms = useCallback(async (stormLevel) => {
-    if (stormAlertSentLevel === stormLevel) return; // already sent for this level
+    if (stormAlertSentLevelRef.current === stormLevel) return; // already sent for this level
+    stormAlertSentLevelRef.current = stormLevel;
     const saved = localStorage.getItem('fisher_profile');
     if (!saved || !weather) return;
     const profile = JSON.parse(saved);
@@ -294,11 +295,12 @@ function App() {
     } catch (err) {
       console.warn('[Storm SMS] Failed:', err.message);
     }
-  }, [stormAlertSentLevel, weather, position, language]);
+  }, [weather, position, language]);
 
   // Reset storm SMS lock when conditions return to safe
   useEffect(() => {
     if (weather?.stormInfo?.level === 'safe') {
+      stormAlertSentLevelRef.current = null;
       setStormAlertSentLevel(null);
     }
   }, [weather]);

@@ -160,7 +160,6 @@ export default function OfflineTileLayerComponent() {
     // Create custom tile layer
     const tileLayer = new CachedTileLayer(ONLINE_TILE_URL, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      subdomains: ['a', 'b', 'c'],
       maxZoom: 19,
       crossOrigin: true
     });
