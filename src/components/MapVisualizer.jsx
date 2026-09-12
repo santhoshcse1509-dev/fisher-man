@@ -49,6 +49,10 @@ function MapController({ position, isFollowing, onUserInteraction, onMapClick })
 }
 
 export default function MapVisualizer({ position, status, isFollowing, setIsFollowing, savedSpots = [], onRemoveSpot, navigationTarget, onMapClick, language }) {
+  const safeLat = Number.isFinite(position?.lat) ? position.lat : 9.28;
+  const safeLng = Number.isFinite(position?.lng) ? position.lng : 79.3;
+  const currentPos = { lat: safeLat, lng: safeLng };
+
   const borderLine = BORDER_POINTS.map(p => [p.lat, p.lng]);
   
   const statusColor = {
@@ -76,7 +80,7 @@ export default function MapVisualizer({ position, status, isFollowing, setIsFoll
   return (
     <div className="h-full w-full absolute inset-0 z-0">
       <MapContainer 
-        center={[position.lat, position.lng]} 
+        center={[currentPos.lat, currentPos.lng]} 
         zoom={13} 
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
@@ -85,7 +89,7 @@ export default function MapVisualizer({ position, status, isFollowing, setIsFoll
         <OfflineTileLayer />
 
         {/* Cyclone tracker overlay */}
-        <CycloneLayer position={position} language={language} />
+        <CycloneLayer position={currentPos} language={language} />
         
         {/* Border Line */}
         <Polyline 
@@ -96,18 +100,18 @@ export default function MapVisualizer({ position, status, isFollowing, setIsFoll
         {/* Navigation Line to Target Net */}
         {navigationTarget && (
           <Polyline 
-            positions={[[position.lat, position.lng], [navigationTarget.lat, navigationTarget.lng]]}
+            positions={[[currentPos.lat, currentPos.lng], [navigationTarget.lat, navigationTarget.lng]]}
             pathOptions={{ color: '#ea580c', weight: 3, dashArray: '5, 10' }}
           />
         )}
         
         {/* User Position */}
         <Circle 
-          center={[position.lat, position.lng]}
+          center={[currentPos.lat, currentPos.lng]}
           pathOptions={{ fillColor: statusColor, color: statusColor, fillOpacity: 0.3 }}
           radius={500}
         />
-        <Marker position={[position.lat, position.lng]} icon={userMarkerIcon} />
+        <Marker position={[currentPos.lat, currentPos.lng]} icon={userMarkerIcon} />
         
         {/* Saved Spots & Nets */}
         {savedSpots.map((spot, idx) => (
@@ -127,7 +131,7 @@ export default function MapVisualizer({ position, status, isFollowing, setIsFoll
         ))}
 
         <MapController 
-          position={[position.lat, position.lng]} 
+          position={[currentPos.lat, currentPos.lng]} 
           isFollowing={isFollowing}
           onUserInteraction={() => setIsFollowing(false)}
           onMapClick={onMapClick}

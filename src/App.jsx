@@ -34,7 +34,33 @@ const sirenSound = new Howl({
 });
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('fisher_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (_e) {
+      return null;
+    }
+  });
+
+  const handleLogin = (id) => {
+    const userData = { id };
+    setUser(userData);
+    try {
+      localStorage.setItem('fisher_user', JSON.stringify(userData));
+    } catch (_e) {
+      // Ignore storage errors in incognito mode
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem('fisher_user');
+    } catch (_e) {
+      // Ignore storage errors in incognito mode
+    }
+  };
   const [position, setPosition] = useState({ lat: 9.28, lng: 79.3 });
   const [heading, setHeading] = useState(0);
   const [speed, setSpeed] = useState(0);
@@ -540,7 +566,7 @@ function App() {
     }, 2000);
   };
 
-  if (!user) return <Auth onLogin={(id) => setUser({ id })} />;
+  if (!user) return <Auth onLogin={handleLogin} />;
 
   const themeColors = {
     safe: nightMode ? 'bg-emerald-900/90 text-emerald-100' : 'bg-emerald-500 text-white',
@@ -560,7 +586,7 @@ function App() {
 
   return (
     <div className={clsx(
-      "relative w-full h-full flex flex-col font-sans overflow-hidden transition-colors duration-500",
+      "relative w-full min-h-screen h-screen h-[100dvh] flex flex-col font-sans overflow-hidden transition-colors duration-500",
       nightMode ? "bg-slate-900" : "bg-ocean-50",
       sosMode && "animate-pulse bg-red-900"
     )}>
@@ -840,7 +866,7 @@ function App() {
                 <button id="night-btn-desktop" onClick={() => setNightMode(!nightMode)} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition touch-target">
                   {nightMode ? <Sun size={18} className="text-yellow-300" /> : <Moon size={18} className="text-white" />}
                 </button>
-                <button id="logout-btn-desktop" onClick={() => setUser(null)} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition touch-target"><LogOut size={18} className="text-white" /></button>
+                <button id="logout-btn-desktop" onClick={handleLogout} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition touch-target"><LogOut size={18} className="text-white" /></button>
                 <button
                   id="gps-btn-desktop"
                   onClick={() => { setIsGpsMode(true); setIsSimulating(false); setIsFollowing(true); }}
@@ -921,7 +947,7 @@ function App() {
                 {nightMode ? <Sun size={14} className="text-yellow-300" /> : <Moon size={14} />}
                 {nightMode ? 'Day Mode' : 'Night Mode'}
               </button>
-              <button id="logout-btn-mobile" onClick={() => setUser(null)}
+              <button id="logout-btn-mobile" onClick={() => { handleLogout(); setMenuOpen(false); }}
                 className="flex items-center gap-2 px-3 py-2.5 bg-white/20 text-white rounded-xl text-xs font-bold hover:bg-white/30 transition touch-target">
                 <LogOut size={14} /> Logout
               </button>
