@@ -30,7 +30,7 @@ const sirenSound = new Howl({
   ],
   loop: true,
   volume: 0.8,
-  html5: true,
+  html5: false,
 });
 
 function App() {

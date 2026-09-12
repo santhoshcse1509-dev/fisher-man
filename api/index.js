@@ -32,24 +32,7 @@ const PORT = process.env.PORT || 3001;
 app.use(express.json());
 
 // Allow local dev + any production origin configured via env var
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:4173',
-  process.env.FRONTEND_URL,           // e.g. https://waveguard.vercel.app
-].filter(Boolean);
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman) or from allowed list
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS] Blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST'],
-}));
+app.use(cors());
 
 // ── Hardware Cache & Endpoints ───────────────────────────────────────────────
 let latestHardwareState = {
