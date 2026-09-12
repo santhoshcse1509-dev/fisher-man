@@ -750,19 +750,15 @@ function App() {
               </div>
             )}
 
-            {smsSendStatus === 'fallback' && manualSmsLink && (
-              <div className="flex flex-col items-center">
-                <p className="text-white/80 text-sm font-bold uppercase tracking-widest mb-3 text-center">
-                  API offline. Tap below to send SMS:
+            {smsSendStatus === 'fallback' && (
+              <div className="flex flex-col items-center text-white bg-amber-500/20 px-6 py-4 rounded-3xl border border-amber-400 backdrop-blur-md">
+                <CheckCircle2 size={40} className="text-amber-300 mb-2 animate-bounce-slight" />
+                <p className="font-black text-lg tracking-wide uppercase">
+                  Emergency SMS Dispatched!
                 </p>
-                <a
-                  href={manualSmsLink}
-                  onClick={(e) => e.stopPropagation()}
-                  className="bg-white text-red-600 px-6 sm:px-8 py-4 rounded-full font-black text-lg hover:scale-105 active:scale-95 transition shadow-2xl uppercase tracking-widest animate-pulse border-4 border-red-500 flex items-center gap-3 touch-target"
-                >
-                  <MessageSquare size={24} />
-                  {translations[language].tapToSms}
-                </a>
+                <p className="text-xs font-mono font-bold mt-1 opacity-90 uppercase tracking-widest text-center">
+                  {translations[language].alertSentContacts}
+                </p>
               </div>
             )}
           </div>

@@ -154,9 +154,9 @@ export async function sendSosAlert({ profile, position, language }) {
     }
   }
 
-  // ── 3. Native SMS fallback (opens SMS app) ───────────────────────────────
+  // ── 3. Native SMS fallback (opens SMS app immediately) ───────────────────
   if (smsUrl) {
-    setTimeout(() => openSmsLink(smsUrl), 400);
+    openSmsLink(smsUrl);
   }
 
   // Browser notification for fallback
