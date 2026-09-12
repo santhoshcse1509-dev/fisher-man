@@ -9,7 +9,7 @@ import L from 'leaflet';
 import { getCachedTile } from '../utils/tileCache';
 
 // Online tile URLs
-const ONLINE_TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const ONLINE_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // Custom Leaflet TileLayer that checks IndexedDB first
@@ -160,8 +160,8 @@ export default function OfflineTileLayerComponent() {
   useEffect(() => {
     // Create custom tile layer
     const tileLayer = new CachedTileLayer(ONLINE_TILE_URL, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: ['a', 'b', 'c', 'd'],
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: ['a', 'b', 'c'],
       maxZoom: 19,
       crossOrigin: true
     });

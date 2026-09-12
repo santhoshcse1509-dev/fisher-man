@@ -48,7 +48,13 @@ function calculateRoughDistance(lat1, lon1, lat2, lon2) {
  * Detects if the device is likely using network triangulation or satellite GPS
  * based on accuracy and speed data.
  */
-export const detectSource = (accuracy, speed) => {
+/**
+ * Detects if the device is likely using network triangulation or satellite GPS
+ * based on accuracy and speed data.
+ */
+export const detectSource = (accuracy, speed, overrideSource = null) => {
+  if (overrideSource) return overrideSource;
+  if (!accuracy) return 'Unknown';
   if (accuracy < 15) return 'GPS';
   if (accuracy > 100) return 'Network';
   
@@ -56,4 +62,88 @@ export const detectSource = (accuracy, speed) => {
   if (accuracy < 30 && (speed === null || speed === 0)) return 'GPS/Static';
   
   return 'Hybrid';
+};
+
+const LAST_LOCATION_KEY = 'waveguard_last_known_location';
+
+/**
+ * Saves last known position to LocalStorage for 0ms instant startup
+ */
+export const saveLastKnownLocation = (location) => {
+  try {
+    if (location && location.lat && location.lng) {
+      localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify({
+        lat: location.lat,
+        lng: location.lng,
+        accuracy: location.accuracy || 100,
+        source: location.source || 'Cached',
+        timestamp: Date.now()
+      }));
+    }
+  } catch (_e) {
+    // Ignore localStorage errors (e.g. incognito restriction)
+  }
+};
+
+/**
+ * Retrieves last known position from LocalStorage if fresh (< 7 days)
+ */
+export const getLastKnownLocation = () => {
+  try {
+    const saved = localStorage.getItem(LAST_LOCATION_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+      if (parsed.lat && parsed.lng && (Date.now() - parsed.timestamp < SEVEN_DAYS_MS)) {
+        return {
+          ...parsed,
+          source: 'Cached Position'
+        };
+      }
+    }
+  } catch (_e) {
+    // Ignore parse errors
+  }
+  return null;
+};
+
+/**
+ * Coarse IP-based Geolocation fallback for fast location detection when browser GPS is slow or blocked
+ */
+export const fetchIpLocation = async () => {
+  const providers = [
+    {
+      url: 'https://ipapi.co/json/',
+      extract: (d) => (d.latitude && d.longitude ? { lat: Number(d.latitude), lng: Number(d.longitude) } : null)
+    },
+    {
+      url: 'https://freeipapi.com/api/json',
+      extract: (d) => (d.latitude && d.longitude ? { lat: Number(d.latitude), lng: Number(d.longitude) } : null)
+    }
+  ];
+
+  for (const provider of providers) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch(provider.url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        const coords = provider.extract(data);
+        if (coords) {
+          return {
+            lat: coords.lat,
+            lng: coords.lng,
+            accuracy: 10000, // Coarse IP accuracy (~10km)
+            source: 'IP Location'
+          };
+        }
+      }
+    } catch (err) {
+      console.warn(`[LocationService] IP provider (${provider.url}) failed:`, err.message);
+    }
+  }
+
+  return null;
 };

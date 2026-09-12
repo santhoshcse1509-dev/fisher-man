@@ -16,29 +16,51 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['vite.svg'],
+      includeAssets: ['vite.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
       manifest: {
-        name: 'WaveGuard',
+        name: 'WaveGuard: Maritime Safety & Border Alert',
         short_name: 'WaveGuard',
-        description: 'Alerts fishermen when nearing international borders',
+        description: 'Safety and navigation assistant for fishermen near international borders',
         theme_color: '#0ea5e9',
         background_color: '#0c4a6e',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'any',
+        start_url: '/',
+        scope: '/',
+        id: '/',
+        categories: ['navigation', 'weather', 'utilities'],
         icons: [
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
           {
             src: 'vite.svg',
             sizes: 'any',
             type: 'image/svg+xml',
-            purpose: 'any maskable'
+            purpose: 'any'
           }
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,mp3,wav}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
+            urlPattern: /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'osm-tiles',
@@ -52,10 +74,10 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/.*\.basemaps\.cartocdn\.com\/.*/i,
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'carto-tiles',
+              cacheName: 'osm-tiles-direct',
               expiration: {
                 maxEntries: 1000,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 Days

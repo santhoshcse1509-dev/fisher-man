@@ -31,3 +31,6 @@ server/.env
 # ESLint output files
 eslint-results*.json
 eslint-output*.txt
+eslint-check*.txt
+eslint.json
+lint*.txt

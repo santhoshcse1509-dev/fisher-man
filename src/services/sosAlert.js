@@ -86,6 +86,13 @@ export async function sendSosAlert({ profile, position, language }) {
 
   const smsUrl = rawNumbers.length > 0 ? buildSmsUrl(rawNumbers, fallbackMsg) : null;
 
+  // Always trigger the hardware SOS backend endpoint so ESP32 detects SOS
+  try {
+    fetch('/api/trigger-sos', { method: 'POST' }).catch(() => {});
+  } catch (_e) {
+    // Ignore fetch error
+  }
+
   if (rawNumbers.length === 0) {
     return { success: false, sent: 0, provider: 'none', smsUrl: null, displayNumbers };
   }

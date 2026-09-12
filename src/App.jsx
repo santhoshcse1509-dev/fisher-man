@@ -10,12 +10,13 @@ import OfflineMapManager from './components/OfflineMapManager';
 import TamilVoiceAssistant from './components/TamilVoiceAssistant';
 import { getDistanceToBorder, getStatus, calculateDistance, getSafeDirection } from './utils/geo';
 import { useAdvancedLocation } from './hooks/useAdvancedLocation';
+import { useOfflineStormDetector } from './hooks/useOfflineStormDetector';
 import { sendSosAlert } from './services/sosAlert';
 import { fetchMarineWeather } from './services/weatherService';
 
 import {
   AlertTriangle, ShieldCheck, Siren, Navigation, Volume2, VolumeX,
-  Moon, Sun, Signal, SignalHigh, SignalLow, MapPin, Crosshair,
+  Moon, Sun, Signal, SignalHigh, SignalLow, MapPin, Crosshair, RefreshCw,
   LogOut, Anchor, Target, History, Save, X, User, ArrowBigUp,
   Phone, Map, Download, Languages, Menu, CheckCircle2, Loader2, MessageSquare
 } from 'lucide-react';
@@ -24,7 +25,10 @@ import clsx from 'clsx';
 import { Howl } from 'howler';
 
 const sirenSound = new Howl({
-  src: ['https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3'],
+  src: [
+    '/sounds/siren.mp3', // local path for PWA offline support
+    'https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3'
+  ],
   loop: true,
   volume: 0.8,
 });
@@ -65,11 +69,73 @@ function App() {
   // SMS sending status: 'idle' | 'sending' | 'sent' | 'fallback'
   const [smsSendStatus, setSmsSendStatus] = useState('idle');
   const [smsSentCount, setSmsSentCount] = useState(0);
+  const [profile, setProfile] = useState(() => {
+    const saved = localStorage.getItem('fisher_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [hardwareConnected, setHardwareConnected] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+      }
+    } else {
+      alert(language === 'ta'
+        ? "WaveGuard செயலியை கணினி/மொபைலில் நிறுவ: பிரவுசர் மெனுவில் 'Install App' அல்லது 'Add to Home Screen' அழுத்தவும்."
+        : "To install WaveGuard on your desktop or mobile: click 'Install App' or 'Add to Home Screen' in your browser menu.");
+    }
+  };
+
+  const refreshProfile = useCallback(() => {
+    const saved = localStorage.getItem('fisher_profile');
+    setProfile(saved ? JSON.parse(saved) : null);
+  }, []);
+
+  // Hardware status & GPS synchronization
+  useEffect(() => {
+    if (!user) return;
+    const checkHardware = async () => {
+      try {
+        const res = await fetch('/api/hardware-status');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.connected && data.lat && data.lng) {
+            setHardwareConnected(true);
+            setPosition({ lat: data.lat, lng: data.lng });
+            if (data.speed !== undefined) setSpeed(data.speed);
+            if (data.heading !== undefined) setHeading(data.heading);
+            if (data.sos && !sosMode) {
+              setSosMode(true);
+            }
+          } else {
+            setHardwareConnected(false);
+          }
+        }
+      } catch (_e) {
+        setHardwareConnected(false);
+      }
+    };
+    checkHardware();
+    const hwInterval = setInterval(checkHardware, 3000);
+    return () => clearInterval(hwInterval);
+  }, [user, sosMode]);
 
   // ── Weather & Storm state ──────────────────────────────────────────────────
   const [weather, setWeather] = useState(null);
   const [stormAlertSentLevel, setStormAlertSentLevel] = useState(null);
-  const weatherPollRef = useRef(null);
 
   // ── NEW: hamburger menu state ──────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
@@ -89,6 +155,7 @@ function App() {
       statusSafe: 'You are Safe', confirmRemove: 'Remove this spot?',
       sysAlertTest: 'System Alert Test Initiated', testStarted: 'System check started',
       navMenu: 'Navigation Menu', setPos: 'Set Position', navSafe: 'Navigate Safe',
+      installApp: 'Install App',
     },
     ta: {
       safe: 'பாதுகாப்பான பகுதி', warning: 'எச்சரிக்கை: எல்லை அருகில்',
@@ -107,6 +174,7 @@ function App() {
       statusSafe: 'நீங்கள் பாதுகாப்பாக உள்ளீர்கள்', confirmRemove: 'இந்த இடத்தை நீக்கவா?',
       sysAlertTest: 'கணினி ஆய்வு துவங்கப்பட்டது', testStarted: 'ஆய்வு துவங்கப்பட்டது',
       navMenu: 'வழிசெலுத்தல் மெனு', setPos: 'இடத்தை அமை', navSafe: 'பாதுகாப்பாக செல்',
+      installApp: 'செயலியை நிறுவு',
     }
   };
 
@@ -128,6 +196,8 @@ function App() {
   }, []);
 
   // ── Real weather polling (every 10 minutes) ────────────────────────────────
+  // Note: the interval callback now uses a ref to get the current position
+  // without re-creating the interval when the position changes.
   const refreshWeather = useCallback(async (lat, lng) => {
     try {
       const data = await fetchMarineWeather(lat, lng);
@@ -137,16 +207,21 @@ function App() {
     }
   }, []);
 
+  const posRef = useRef(position);
+  useEffect(() => { posRef.current = position; }, [position]);
+
   useEffect(() => {
     if (!user) return;
-    // Fetch immediately with current position
-    refreshWeather(position.lat, position.lng);
-    // Re-fetch every 10 minutes
-    weatherPollRef.current = setInterval(() => {
-      refreshWeather(position.lat, position.lng);
+    // Initial fetch
+    refreshWeather(posRef.current.lat, posRef.current.lng);
+
+    // Set stable interval
+    const interval = setInterval(() => {
+      refreshWeather(posRef.current.lat, posRef.current.lng);
     }, 10 * 60 * 1000);
-    return () => clearInterval(weatherPollRef.current);
-  }, [user, position, refreshWeather]);
+
+    return () => clearInterval(interval);
+  }, [user, refreshWeather]);
 
   // Re-fetch weather when position changes significantly (> 5km)
   const lastWeatherPos = useRef({ lat: null, lng: null });
@@ -257,14 +332,41 @@ function App() {
      
   }, [position, language, user, status]);
 
-  const advLoc = useAdvancedLocation({ enableHighAccuracy: true, timeout: 15000, seaOptimized: true });
+  const advLoc = useAdvancedLocation({ enableHighAccuracy: true, timeout: 30000, seaOptimized: true });
+  const { offlineStormAlert, clearAlert } = useOfflineStormDetector();
 
+  // ── Auto trigger SOS when offline Barometer detects sudden pressure drop
+  useEffect(() => {
+    if (offlineStormAlert && !sosMode) {
+      speak(language === 'ta' 
+        ? "எச்சரிக்கை! வளிமண்டல அழுத்தம் குறைகிறது! புயல் வருகிறது!" 
+        : "Warning! Sudden pressure drop detected. Cyclone approaching!");
+      if ("vibrate" in navigator) navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 1000]);
+      if (!muted) sirenSound.play();
+      setSosMode(true);
+      setTimeout(() => clearAlert(), 10000); // Clear alert flag after triggering
+    }
+  }, [offlineStormAlert, sosMode, language, muted, clearAlert]);
+
+  // ── Sync GPS location → app state ──────────────────────────────────────────
   useEffect(() => {
     if (isGpsMode && !isSimulating && user && advLoc.lat !== null && advLoc.lng !== null) {
       setPosition({ lat: advLoc.lat, lng: advLoc.lng });
       setHeading(advLoc.heading || 0);
       setSpeed(advLoc.speed * 1.94384);
       setGpsAccuracy(advLoc.accuracy);
+    }
+    // If GPS has error but no position yet, try a one-shot getCurrentPosition
+    // as emergency fallback to at least get a rough location
+    if (isGpsMode && !isSimulating && user && advLoc.lat === null && advLoc.error) {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setGpsAccuracy(pos.coords.accuracy);
+        },
+        () => { /* one-shot fallback also failed, rely on retry */ },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }
+      );
     }
   }, [advLoc, isGpsMode, isSimulating, user]);
 
@@ -326,9 +428,20 @@ function App() {
    */
   const sendEmergencyAlertAutomated = async () => {
     const saved = localStorage.getItem('fisher_profile');
-    if (!saved) return;
+    if (!saved) {
+      console.warn('[SOS] No profile setup – skipping automated SMS');
+      setSmsSendStatus('fallback');
+      return;
+    }
 
     const profile = JSON.parse(saved);
+    // Check if any numbers are actually provided
+    if (!profile.family1 && !profile.family2 && !profile.police) {
+      console.warn('[SOS] No emergency contacts – skipping automated SMS');
+      setSmsSendStatus('fallback');
+      return;
+    }
+
     setSmsSendStatus('sending');
 
     try {
@@ -382,7 +495,7 @@ function App() {
       const playAlert = () => {
         if (toggle) speak("ஆபத்து.. உதவி தேவை..", 'ta-IN');
         else speak("SOS.. Help Needed..", 'en-US');
-        if ("vibrate" in navigator) navigator.vibrate([500, 200, 500]);
+        if ("vibrate" in navigator) navigator.vibrate([1000, 300, 1000, 300, 1000]);
         toggle = !toggle;
       };
       playAlert();
@@ -394,12 +507,24 @@ function App() {
       if ("vibrate" in navigator) navigator.vibrate(0);
       sirenSound.stop();
       setSmsSendStatus('idle');
+      fetch('/api/clear-sos', { method: 'POST' }).catch(() => {});
     }
     return () => { if (sosIntervalRef.current) clearInterval(sosIntervalRef.current); };
      
   }, [sosMode]);
 
-  const toggleSOS = () => setSosMode(!sosMode);
+  const toggleSOS = () => {
+    if (!sosMode) {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([1000, 300, 1000, 300, 1000]);
+      }
+    } else {
+      if ("vibrate" in navigator) {
+        navigator.vibrate(0);
+      }
+    }
+    setSosMode(!sosMode);
+  };
 
   const handleVoiceCommand = (cmd) => {
     switch (cmd) {
@@ -455,7 +580,7 @@ function App() {
       />
       <Profile
         isOpen={showProfile}
-        onClose={() => setShowProfile(false)}
+        onClose={() => { setShowProfile(false); refreshProfile(); }}
         language={language}
         onTestAlert={triggerTestAlert}
       />
@@ -605,9 +730,9 @@ function App() {
             <div className="mt-2 text-white/90 text-sm font-mono w-full max-w-sm px-4">
               <div className="space-y-2">
                 {[
-                  { num: localStorage.getItem('fisher_profile') ? JSON.parse(localStorage.getItem('fisher_profile')).family1 : '', label: 'Family 1' },
-                  { num: localStorage.getItem('fisher_profile') ? JSON.parse(localStorage.getItem('fisher_profile')).family2 : '', label: 'Family 2' },
-                  { num: localStorage.getItem('fisher_profile') ? JSON.parse(localStorage.getItem('fisher_profile')).police : '', label: 'Police' }
+                  { num: profile?.family1, label: 'Family 1' },
+                  { num: profile?.family2, label: 'Family 2' },
+                  { num: profile?.police, label: 'Police' }
                 ].filter(c => c.num).map((contact, idx) => {
                   const cleanNum = contact.num.replace(/\D/g, '');
                   const msg = `SOS: Fisher User in DANGER at ${position.lat.toFixed(4)},${position.lng.toFixed(4)}. Help!`;
@@ -705,6 +830,15 @@ function App() {
                     {translations[language].navSafe}
                   </button>
                 )}
+                <button
+                  id="install-pwa-btn-desktop"
+                  onClick={handleInstallApp}
+                  className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-full shadow-lg border border-white text-xs font-bold flex items-center gap-1 touch-target"
+                  title={translations[language].installApp}
+                >
+                  <Download size={12} />
+                  {translations[language].installApp}
+                </button>
                 <button id="profile-btn-desktop" onClick={() => setShowProfile(true)} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition touch-target"><User size={18} className="text-white" /></button>
                 <button id="history-btn-desktop" onClick={() => setShowHistory(true)} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition touch-target"><History size={18} className="text-white" /></button>
                 <button id="night-btn-desktop" onClick={() => setNightMode(!nightMode)} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition touch-target">
@@ -771,6 +905,13 @@ function App() {
                   <Navigation size={14} /> {translations[language].navSafe}
                 </button>
               )}
+              <button
+                id="install-pwa-btn-mobile"
+                onClick={() => { handleInstallApp(); setMenuOpen(false); }}
+                className="flex items-center gap-2 px-3 py-2.5 bg-sky-600/80 text-white rounded-xl text-xs font-bold hover:bg-sky-600 transition touch-target"
+              >
+                <Download size={14} /> {translations[language].installApp}
+              </button>
               <button id="profile-btn-mobile" onClick={() => { setShowProfile(true); setMenuOpen(false); }}
                 className="flex items-center gap-2 px-3 py-2.5 bg-white/20 text-white rounded-xl text-xs font-bold hover:bg-white/30 transition touch-target">
                 <User size={14} /> Profile
@@ -839,16 +980,20 @@ function App() {
           />
         </div>
 
-        {!isFollowing && (
-          <button
-            id="recenter-btn"
-            onClick={() => setIsFollowing(true)}
-            className="p-2.5 sm:p-3 bg-white text-blue-600 rounded-full shadow-xl border border-blue-200 animate-bounce touch-target"
-            aria-label="Re-center map"
-          >
-            <Crosshair size={22} />
-          </button>
-        )}
+        <button
+          id="recenter-btn"
+          onClick={() => {
+            setIsFollowing(true);
+            if (advLoc.reDetectLocation) {
+              advLoc.reDetectLocation();
+            }
+          }}
+          className={`p-2.5 sm:p-3 bg-white text-blue-600 rounded-full shadow-xl border border-blue-200 transition-transform active:scale-95 touch-target ${!isFollowing ? 'animate-bounce border-blue-400 ring-2 ring-blue-400/50' : ''}`}
+          aria-label="Re-center map and auto-detect location"
+          title="Auto-detect current location & re-center map"
+        >
+          <Crosshair size={22} className={!isFollowing ? 'text-blue-600' : 'text-slate-600'} />
+        </button>
 
         <button
           id="drop-net-btn"
@@ -905,9 +1050,9 @@ function App() {
                 </p>
                 <div className="flex flex-col gap-2 mb-2">
                   {[
-                    { num: localStorage.getItem('fisher_profile') ? JSON.parse(localStorage.getItem('fisher_profile')).family1 : '', label: 'Family 1' },
-                    { num: localStorage.getItem('fisher_profile') ? JSON.parse(localStorage.getItem('fisher_profile')).family2 : '', label: 'Family 2' },
-                    { num: localStorage.getItem('fisher_profile') ? JSON.parse(localStorage.getItem('fisher_profile')).police : '', label: 'Police' }
+                    { num: profile?.family1, label: 'Family 1' },
+                    { num: profile?.family2, label: 'Family 2' },
+                    { num: profile?.police, label: 'Police' }
                   ].filter(c => c.num).map((contact, idx) => {
                     const cleanNum = contact.num.replace(/\D/g, '');
                     const msg = `EMERGENCY: Fisher User is at border ${position.lat.toFixed(4)},${position.lng.toFixed(4)}. Help!`;
@@ -973,14 +1118,52 @@ function App() {
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
 
-          <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white text-xs sm:text-sm font-mono shadow-xl border border-white/10">
-            {gpsAccuracy
-              ? (gpsAccuracy < 20
-                ? <SignalHigh size={14} className="text-emerald-400" />
-                : <SignalLow size={14} className="text-amber-400" />)
-              : <Signal size={14} className="text-red-400 animate-pulse" />
-            }
-            <span className="uppercase">{advLoc.source}: {gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'SEARCHING'}</span>
+          <div className="flex flex-col items-center gap-2">
+            {isSimulating && (
+              <div className="bg-amber-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg animate-pulse border-2 border-white flex items-center gap-2">
+                <Target size={12} />
+                SIMULATION MODE - GPS OFF
+              </div>
+            )}
+
+            {/* GPS Error Banner */}
+            {advLoc.error && (
+              <div className="flex items-center gap-2 bg-red-600/90 backdrop-blur-md px-4 py-2 rounded-2xl text-white text-xs font-medium shadow-xl border border-red-400/30 max-w-xs text-center">
+                <AlertTriangle size={16} className="text-yellow-300 shrink-0" />
+                <span>{advLoc.error}</span>
+                <button
+                  onClick={() => advLoc.requestPermission()}
+                  className="ml-1 p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors shrink-0"
+                  aria-label="Retry GPS"
+                  title="Retry location detection"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white text-xs sm:text-sm font-mono shadow-xl border border-white/10">
+              {advLoc.error
+                ? <Signal size={14} className="text-red-400 animate-pulse" />
+                : gpsAccuracy
+                  ? (gpsAccuracy < 20
+                    ? <SignalHigh size={14} className="text-emerald-400" />
+                    : <SignalLow size={14} className="text-amber-400" />)
+                  : <Signal size={14} className="text-amber-400 animate-pulse" />
+              }
+              <span className="uppercase">
+                {advLoc.error
+                  ? `${advLoc.source === 'denied' ? 'DENIED' : advLoc.source === 'timeout' ? 'TIMEOUT' : 'NO SIGNAL'}`
+                  : `${advLoc.source}: ${gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'SEARCHING...'}`
+                }
+              </span>
+              {!gpsAccuracy && !advLoc.error && (
+                <RefreshCw size={12} className="animate-spin text-sky-300" />
+              )}
+              {hardwareConnected && (
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/40 uppercase">IoT ACTIVE</span>
+              )}
+            </div>
           </div>
         </div>
 

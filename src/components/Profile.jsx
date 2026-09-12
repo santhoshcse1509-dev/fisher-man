@@ -10,6 +10,8 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
     family2: '',
     police: ''
   });
+  const [saved, setSaved] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const translations = {
     en: {
@@ -51,15 +53,35 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
 
   if (!isOpen) return null;
 
+  const validatePhone = (val) => {
+    if (!val) return true; // optional fields are ok empty
+    const digits = String(val).replace(/\D/g, '');
+    return digits.length >= 10;
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error on change
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: false }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    // Validate all phone fields
+    const newErrors = {};
+    ['mobile', 'family1', 'family2', 'police'].forEach(field => {
+      if (formData[field] && !validatePhone(formData[field])) {
+        newErrors[field] = true;
+      }
+    });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
     localStorage.setItem('fisher_profile', JSON.stringify(formData));
-    alert(t.saved);
-    onClose();
+    setSaved(true);
+    setTimeout(() => { setSaved(false); onClose(); }, 1200);
   };
 
   return (
@@ -145,6 +167,7 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
               value={formData.mobile}
               onChange={handleChange}
               required
+              hasError={errors.mobile}
             />
             <InputGroup
               id="profile-family1"
@@ -154,6 +177,7 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
               value={formData.family1}
               onChange={handleChange}
               required
+              hasError={errors.family1}
             />
             <InputGroup
               id="profile-family2"
@@ -163,6 +187,7 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
               value={formData.family2}
               onChange={handleChange}
               required
+              hasError={errors.family2}
             />
             <InputGroup
               id="profile-police"
@@ -172,6 +197,7 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
               value={formData.police}
               onChange={handleChange}
               required
+              hasError={errors.police}
             />
           </div>
 
@@ -189,10 +215,17 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
             <button
               type="submit"
               id="profile-save-btn"
-              className="flex-1 py-3.5 sm:py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition flex justify-center items-center gap-2 touch-target"
+              className={`flex-1 py-3.5 sm:py-4 font-bold rounded-xl shadow-lg transition flex justify-center items-center gap-2 touch-target ${
+                saved
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+                  : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-blue-500/30'
+              }`}
             >
-              <Save size={18} />
-              <span className="truncate">{t.save}</span>
+              {saved ? (
+                <><span className="text-lg">✓</span><span className="truncate">{t.saved}</span></>
+              ) : (
+                <><Save size={18} /><span className="truncate">{t.save}</span></>
+              )}
             </button>
           </div>
         </form>
@@ -201,7 +234,7 @@ export default function Profile({ isOpen, onClose, language, onTestAlert }) {
   );
 }
 
-function InputGroup({ id, icon, label, name, value, onChange, required }) {
+function InputGroup({ id, icon, label, name, value, onChange, required, hasError }) {
   return (
     <div className="relative">
       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
@@ -216,9 +249,16 @@ function InputGroup({ id, icon, label, name, value, onChange, required }) {
         onChange={onChange}
         autoComplete="tel"
         inputMode="tel"
-        className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-black/20 text-slate-800 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-base font-medium transition"
+        className={`w-full pl-9 pr-4 py-3 rounded-xl border bg-white dark:bg-black/20 text-slate-800 dark:text-white focus:ring-1 outline-none text-base font-medium transition ${
+          hasError
+            ? 'border-red-400 focus:border-red-500 focus:ring-red-400 bg-red-50 dark:bg-red-900/20'
+            : 'border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500'
+        }`}
         placeholder={label}
       />
+      {hasError && (
+        <p className="text-red-500 text-xs font-bold mt-1 ml-1">⚠ Enter a valid 10-digit number</p>
+      )}
     </div>
   );
 }

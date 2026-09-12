@@ -1,4 +1,3 @@
-/* eslint-env node */
 /**
  * WaveGuard — SOS SMS Backend Server
  * ----------------------------------------
@@ -12,7 +11,16 @@
  * Fallback: Twilio (uncomment Twilio section if needed)
  */
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env from api/ directory first, then fall back to server/ directory
+dotenv.config({ path: resolve(__dirname, '.env') });
+dotenv.config({ path: resolve(__dirname, '..', 'server', '.env') });
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
@@ -22,16 +30,95 @@ const PORT = process.env.PORT || 3001;
 
 // ── Middleware ──────────────────────────────────────────────────────────────
 app.use(express.json());
+
+// Allow local dev + any production origin configured via env var
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  process.env.FRONTEND_URL,           // e.g. https://waveguard.vercel.app
+].filter(Boolean);
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:4173'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman) or from allowed list
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST'],
 }));
+
+// ── Hardware Cache & Endpoints ───────────────────────────────────────────────
+let latestHardwareState = {
+  connected: false,
+  lat: null,
+  lng: null,
+  speed: 0,
+  heading: 0,
+  sos: false,
+  node: null,
+  timestamp: null,
+};
+
+let sosLatchUntil = 0; // Timestamp until which SOS remains active
+
+app.post(['/api/hardware-update', '/hardware-update'], (req, res) => {
+  const { lat, lng, speed, heading, sos, node } = req.body;
+  if (lat !== undefined && lng !== undefined) {
+    if (sos) {
+      sosLatchUntil = Date.now() + 30000; // Lock for 30s on hardware SOS
+    }
+    const isSosActive = Boolean(sos) || (Date.now() < sosLatchUntil);
+    latestHardwareState = {
+      connected: true,
+      lat: Number(lat),
+      lng: Number(lng),
+      speed: Number(speed || 0),
+      heading: Number(heading || 0),
+      sos: isSosActive,
+      node: node || 'BOAT_01',
+      timestamp: new Date().toISOString(),
+    };
+    console.log(`[Hardware Update] Node: ${node}, Lat: ${lat}, Lng: ${lng}, SOS: ${isSosActive}`);
+    return res.json({ success: true, hardwareState: latestHardwareState });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid hardware GPS data' });
+});
+
+app.post(['/api/trigger-sos', '/trigger-sos'], (req, res) => {
+  sosLatchUntil = Date.now() + 30000; // Lock SOS for 30 seconds
+  latestHardwareState.sos = true;
+  latestHardwareState.timestamp = new Date().toISOString();
+  console.log('🚨 [Web App] SOS Triggered manually!');
+  res.json({ success: true, hardwareState: latestHardwareState });
+});
+
+app.post(['/api/clear-sos', '/clear-sos'], (req, res) => {
+  sosLatchUntil = 0;
+  latestHardwareState.sos = false;
+  console.log('✅ [Web App] SOS Cleared');
+  res.json({ success: true, hardwareState: latestHardwareState });
+});
+
+app.get(['/api/hardware-status', '/hardware-status'], (req, res) => {
+  const isFresh = latestHardwareState.timestamp && (Date.now() - new Date(latestHardwareState.timestamp).getTime() < 30000);
+  const isSosActive = latestHardwareState.sos || (Date.now() < sosLatchUntil);
+  res.json({
+    ...latestHardwareState,
+    sos: Boolean(isSosActive),
+    connected: Boolean(isFresh),
+  });
+});
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'ok',
     smsProvider: process.env.FAST2SMS_API_KEY ? 'fast2sms' : 'not configured',
+    hardwareConnected: Boolean(latestHardwareState.timestamp && (Date.now() - new Date(latestHardwareState.timestamp).getTime() < 30000)),
     timestamp: new Date().toISOString(),
   });
 });
@@ -49,6 +136,11 @@ app.get(['/api/health', '/health'], (req, res) => {
  */
 app.post(['/api/send-sos', '/send-sos'], async (req, res) => {
   const { numbers, fishermanName, lat, lng, language } = req.body;
+
+  // Set hardware state to SOS triggered from web app
+  sosLatchUntil = Date.now() + 30000; // Keep active for 30 seconds
+  latestHardwareState.sos = true;
+  latestHardwareState.timestamp = new Date().toISOString();
 
   // Validate required fields
   if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
@@ -83,9 +175,10 @@ app.post(['/api/send-sos', '/send-sos'], async (req, res) => {
       const response = await axios.post(
         'https://www.fast2sms.com/dev/bulkV2',
         {
-          route: 'q',                          // Quick SMS (transactional-like, no template needed)
+          route: 'q',
           message: message,
-          language: 'english',
+          // 'unicode' is required for Tamil/regional script to render correctly on phones
+          language: language === 'ta' ? 'unicode' : 'english',
           flash: 0,
           numbers: cleanNumbers.join(','),
         },
@@ -130,16 +223,18 @@ app.post(['/api/send-sos', '/send-sos'], async (req, res) => {
       });
 
       const results = await Promise.allSettled(
-        cleanNumbers.map(num =>
-          twilioClient.post(
+        cleanNumbers.map(num => {
+          // Normalize: strip leading 91 or +91 to avoid double-prefix (+9191XXXXXXXXXX)
+          const cleanNum = num.replace(/^(\+?91)/, '');
+          return twilioClient.post(
             '/Messages.json',
             new URLSearchParams({
-              To: `+91${num}`,
+              To: `+91${cleanNum}`,
               From: process.env.TWILIO_FROM_NUMBER,
               Body: message,
             })
-          )
-        )
+          );
+        })
       );
 
       const successCount = results.filter(r => r.status === 'fulfilled').length;
@@ -216,7 +311,7 @@ app.post(['/api/send-storm-alert', '/send-storm-alert'], async (req, res) => {
     try {
       const response = await axios.post(
         'https://www.fast2sms.com/dev/bulkV2',
-        { route: 'q', message, language: 'english', flash: 0, numbers: cleanNumbers.join(',') },
+        { route: 'q', message, language: language === 'ta' ? 'unicode' : 'english', flash: 0, numbers: cleanNumbers.join(',') },
         { headers: { authorization: process.env.FAST2SMS_API_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
       );
       if (response.data.return === true) {
@@ -236,11 +331,12 @@ app.post(['/api/send-storm-alert', '/send-storm-alert'], async (req, res) => {
         timeout: 10000,
       });
       const results = await Promise.allSettled(
-        cleanNumbers.map(num =>
-          twilioClient.post('/Messages.json', new URLSearchParams({
-            To: `+91${num}`, From: process.env.TWILIO_FROM_NUMBER, Body: message,
-          }))
-        )
+        cleanNumbers.map(num => {
+          const cleanNum = num.replace(/^(\+?91)/, '');
+          return twilioClient.post('/Messages.json', new URLSearchParams({
+            To: `+91${cleanNum}`, From: process.env.TWILIO_FROM_NUMBER, Body: message,
+          }));
+        })
       );
       const successCount = results.filter(r => r.status === 'fulfilled').length;
       return res.json({ success: successCount > 0, provider: 'twilio', sent: successCount });
@@ -255,8 +351,8 @@ app.post(['/api/send-storm-alert', '/send-storm-alert'], async (req, res) => {
 
 // ── Start server (Local) or Export (Vercel) ─────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`\n🚨 WaveGuard SOS Server running on http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚨 WaveGuard SOS Server running on http://0.0.0.0:${PORT}`);
     console.log(`   Fast2SMS: ${process.env.FAST2SMS_API_KEY ? '✅ Configured' : '⚠️  Not configured (add to server/.env)'}`);
     console.log(`   Twilio:   ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : '⚠️  Not configured (optional fallback)'}\n`);
   });
