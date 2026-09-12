@@ -36,18 +36,16 @@ function MapController({ position, isFollowing, onUserInteraction, onMapClick })
     }
   });
 
+  const targetLat = Array.isArray(position) ? position[0] : (Number.isFinite(position?.lat) ? position.lat : 9.28);
+  const targetLng = Array.isArray(position) ? position[1] : (Number.isFinite(position?.lng) ? position.lng : 79.3);
+
   useEffect(() => {
-    if (isFollowing && position) {
+    if (isFollowing && Number.isFinite(targetLat) && Number.isFinite(targetLng)) {
       const zoom = map.getZoom();
       const safeZoom = (typeof zoom === 'number' && Number.isFinite(zoom) && zoom > 0) ? zoom : 13;
-      const targetLat = Number.isFinite(position.lat) ? position.lat : 9.28;
-      const targetLng = Number.isFinite(position.lng) ? position.lng : 79.3;
-      map.flyTo([targetLat, targetLng], safeZoom, {
-        animate: true,
-        duration: 2.0
-      });
+      map.setView([targetLat, targetLng], safeZoom);
     }
-  }, [position, isFollowing, map]);
+  }, [targetLat, targetLng, isFollowing, map]);
   
   return null;
 }

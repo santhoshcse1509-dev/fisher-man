@@ -218,8 +218,12 @@ function App() {
   };
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-      Notification.requestPermission();
+    try {
+      if (typeof window !== 'undefined' && "Notification" in window && typeof Notification.requestPermission === 'function' && Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch (_e) {
+      /* ignore permission query error */
     }
   }, []);
 
