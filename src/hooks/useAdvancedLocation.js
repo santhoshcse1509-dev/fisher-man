@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GeoKalmanFilter, KalmanFilter } from '../utils/kalmanFilter';
 import { detectSource, getLastKnownLocation, saveLastKnownLocation, fetchIpLocation } from '../services/locationService';
 
@@ -364,5 +364,9 @@ export function useAdvancedLocation(options = {}) {
     };
   }, [startWatching]);
 
-  return { ...location, requestPermission, reDetectLocation: requestPermission };
+  return useMemo(() => ({
+    ...location,
+    requestPermission,
+    reDetectLocation: requestPermission,
+  }), [location, requestPermission]);
 }

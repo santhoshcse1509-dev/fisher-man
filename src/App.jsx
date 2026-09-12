@@ -130,6 +130,9 @@ function App() {
     setProfile(saved ? JSON.parse(saved) : null);
   }, []);
 
+  const sosModeRef = useRef(sosMode);
+  useEffect(() => { sosModeRef.current = sosMode; }, [sosMode]);
+
   // Hardware status & GPS synchronization
   useEffect(() => {
     if (!user) return;
@@ -140,10 +143,10 @@ function App() {
           const data = await res.json();
           if (data.connected && data.lat && data.lng) {
             setHardwareConnected(true);
-            setPosition({ lat: data.lat, lng: data.lng });
+            setPosition(prev => (prev.lat === data.lat && prev.lng === data.lng ? prev : { lat: data.lat, lng: data.lng }));
             if (data.speed !== undefined) setSpeed(data.speed);
             if (data.heading !== undefined) setHeading(data.heading);
-            if (data.sos && !sosMode) {
+            if (data.sos && !sosModeRef.current) {
               setSosMode(true);
             }
           } else {
@@ -157,7 +160,7 @@ function App() {
     checkHardware();
     const hwInterval = setInterval(checkHardware, 3000);
     return () => clearInterval(hwInterval);
-  }, [user, sosMode]);
+  }, [user]);
 
   // ── Weather & Storm state ──────────────────────────────────────────────────
   const [weather, setWeather] = useState(null);
@@ -307,11 +310,15 @@ function App() {
     localStorage.setItem('fisher_saved_spots', JSON.stringify(savedSpots));
   }, [savedSpots]);
 
+  const posLat = position.lat;
+  const posLng = position.lng;
+
   useEffect(() => {
     if (!user) return;
-    const dist = getDistanceToBorder(position.lat, position.lng);
-    setDistance(dist);
-    setSafeDirection(getSafeDirection(position.lat, position.lng));
+    const dist = getDistanceToBorder(posLat, posLng);
+    setDistance(prev => (prev === dist ? prev : dist));
+    const safeDir = getSafeDirection(posLat, posLng);
+    setSafeDirection(prev => (prev === safeDir ? prev : safeDir));
     const newStatus = getStatus(dist);
     if (newStatus !== status) {
       setStatus(newStatus);
@@ -356,7 +363,7 @@ function App() {
       safeVibrate(0);
     };
      
-  }, [position, language, user, status]);
+  }, [posLat, posLng, language, user, status, muted]);
 
   const advLoc = useAdvancedLocation({ enableHighAccuracy: true, timeout: 30000, seaOptimized: true });
   const { offlineStormAlert, clearAlert } = useOfflineStormDetector();
@@ -375,26 +382,35 @@ function App() {
   }, [offlineStormAlert, sosMode, language, muted, clearAlert]);
 
   // ── Sync GPS location → app state ──────────────────────────────────────────
+  const advLat = advLoc.lat;
+  const advLng = advLoc.lng;
+  const advHeading = advLoc.heading;
+  const advSpeed = advLoc.speed;
+  const advAccuracy = advLoc.accuracy;
+  const advError = advLoc.error;
+
   useEffect(() => {
-    if (isGpsMode && !isSimulating && user && advLoc.lat !== null && advLoc.lng !== null) {
-      setPosition({ lat: advLoc.lat, lng: advLoc.lng });
-      setHeading(advLoc.heading || 0);
-      setSpeed(advLoc.speed * 1.94384);
-      setGpsAccuracy(advLoc.accuracy);
+    if (isGpsMode && !isSimulating && user && advLat !== null && advLng !== null) {
+      setPosition(prev => (prev.lat === advLat && prev.lng === advLng ? prev : { lat: advLat, lng: advLng }));
+      setHeading(prev => (prev === (advHeading || 0) ? prev : (advHeading || 0)));
+      setSpeed(prev => (prev === (advSpeed * 1.94384) ? prev : (advSpeed * 1.94384)));
+      setGpsAccuracy(prev => (prev === advAccuracy ? prev : advAccuracy));
     }
     // If GPS has error but no position yet, try a one-shot getCurrentPosition
     // as emergency fallback to at least get a rough location
-    if (isGpsMode && !isSimulating && user && advLoc.lat === null && advLoc.error) {
+    if (isGpsMode && !isSimulating && user && advLat === null && advError) {
       navigator.geolocation?.getCurrentPosition(
         (pos) => {
-          setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          const newLat = pos.coords.latitude;
+          const newLng = pos.coords.longitude;
+          setPosition(prev => (prev.lat === newLat && prev.lng === newLng ? prev : { lat: newLat, lng: newLng }));
           setGpsAccuracy(pos.coords.accuracy);
         },
         () => { /* one-shot fallback also failed, rely on retry */ },
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }
       );
     }
-  }, [advLoc, isGpsMode, isSimulating, user]);
+  }, [advLat, advLng, advHeading, advSpeed, advAccuracy, advError, isGpsMode, isSimulating, user]);
 
   const handleMapClick = (latlng) => {
     if (manualMode) {
