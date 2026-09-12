@@ -8,8 +8,7 @@ import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { getCachedTile } from '../utils/tileCache';
 
-// Online tile URLs
-const ONLINE_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ONLINE_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // Custom Leaflet TileLayer that checks IndexedDB first

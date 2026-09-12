@@ -26,11 +26,11 @@ import { Howl } from 'howler';
 
 const sirenSound = new Howl({
   src: [
-    '/sounds/siren.mp3', // local path for PWA offline support
     'https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3'
   ],
   loop: true,
   volume: 0.8,
+  html5: true,
 });
 
 function App() {
